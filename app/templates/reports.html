@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Reports - Axis Ops Tracker{% endblock %}
+{% block header %}Reports & Export{% endblock %}
+
+{% block content %}
+<div class="reports-page">
+    <div class="reports-grid">
+        <div class="report-card">
+            <div class="report-icon">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="report-info">
+                <h3>Employee Roster</h3>
+                <p>Complete list of all employees with details</p>
+                <button onclick="generateReport('employee-roster')" class="btn-primary">
+                    <i class="fas fa-download"></i> Generate
+                </button>
+            </div>
+        </div>
+
+        <div class="report-card">
+            <div class="report-icon">
+                <i class="fas fa-chart-bar"></i>
+            </div>
+            <div class="report-info">
+                <h3>Performance Report</h3>
+                <p>Employee performance metrics and statistics</p>
+                <button onclick="generateReport('performance-report')" class="btn-primary">
+                    <i class="fas fa-download"></i> Generate
+                </button>
+            </div>
+        </div>
+
+        <div class="report-card">
+            <div class="report-icon">
+                <i class="fas fa-money-bill-wave"></i>
+            </div>
+            <div class="report-info">
+                <h3>Payment Report</h3>
+                <p>Payment history and financial summary</p>
+                <div class="date-filters">
+                    <input type="date" id="payment-start-date" class="date-input">
+                    <input type="date" id="payment-end-date" class="date-input">
+                </div>
+                <button onclick="generatePaymentReport()" class="btn-primary">
+                    <i class="fas fa-download"></i> Generate
+                </button>
+            </div>
+        </div>
+
+        <div class="report-card">
+            <div class="report-icon">
+                <i class="fas fa-user-tie"></i>
+            </div>
+            <div class="report-info">
+                <h3>Supervisor Report</h3>
+                <p>Team performance by supervisor</p>
+                <button onclick="generateReport('supervisor-report')" class="btn-primary">
+                    <i class="fas fa-download"></i> Generate
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="export-info">
+        <div class="info-card">
+            <i class="fas fa-info-circle"></i>
+            <div>
+                <h4>Report Formats</h4>
+                <p>All reports are generated in CSV format for easy import into Excel or Google Sheets.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function generateReport(reportType) {
+    try {
+        showNotification('Generating report...', 'info');
+        
+        const response = await fetch(`/reports/api/generate/${reportType}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            downloadCSV(data.data, data.filename);
+            showNotification('Report generated successfully!', 'success');
+        } else {
+            showNotification('Error generating report: ' + data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error generating report:', error);
+        showNotification('Error generating report', 'error');
+    }
+}
+
+async function generatePaymentReport() {
+    const startDate = document.getElementById('payment-start-date').value;
+    const endDate = document.getElementById('payment-end-date').value;
+    
+    let url = '/reports/api/generate/payment-report';
+    const params = new URLSearchParams();
+    
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    
+    if (params.toString()) url += '?' + params.toString();
+    
+    try {
+        showNotification('Generating payment report...', 'info');
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.success) {
+            downloadCSV(data.data, data.filename);
+            showNotification('Payment report generated successfully!', 'success');
+        } else {
+            showNotification('Error generating report: ' + data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error generating report:', error);
+        showNotification('Error generating report', 'error');
+    }
+}
+
+function downloadCSV(csvContent, filename) {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    
+    if (navigator.msSaveBlob) {
+        navigator.msSaveBlob(blob, filename);
+    } else {
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+</script>
+{% endblock %}

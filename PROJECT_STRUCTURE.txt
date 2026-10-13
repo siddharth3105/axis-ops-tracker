@@ -1,0 +1,410 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    AXIS OPS TRACKER - PROJECT STRUCTURE                      ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📁 AXIS AI TRACKER/
+│
+├─ 📖 DOCUMENTATION (Read these first!)
+│  ├─ 🚀 START_HERE.md              ← Start here! Quick overview
+│  ├─ 📘 README.md                  ← Complete technical documentation
+│  ├─ 📗 SETUP_GUIDE.md             ← Step-by-step setup instructions
+│  ├─ 📙 HOW_TO_RUN.md              ← All methods to run the app
+│  ├─ 📕 TROUBLESHOOTING.md         ← Solutions to common problems
+│  ├─ 📓 INSTALL_PYTHON.md          ← Python installation guide
+│  └─ 📑 INDEX.md                   ← Complete documentation index
+│
+├─ ⚡ QUICK START FILES (Use these to run!)
+│  ├─ 🚀 start.bat                  ← Windows batch launcher (easiest!)
+│  ├─ 🚀 quick_start.ps1            ← PowerShell launcher
+│  └─ 🐍 run.py                     ← Main application entry point
+│
+├─ 📦 CONFIGURATION
+│  ├─ 📄 requirements.txt           ← Python dependencies
+│  ├─ 📄 .gitignore                 ← Git ignore rules
+│  └─ 📄 PROJECT_STRUCTURE.txt      ← This file!
+│
+├─ 📁 app/ (Flask Application Core)
+│  │
+│  ├─ 📄 __init__.py                ← App initialization & config
+│  │
+│  ├─ 📁 models/ (Database Models)
+│  │  ├─ 📄 __init__.py
+│  │  └─ 📄 employee.py             ← Employee, Performance, Payment, Attendance
+│  │
+│  ├─ 📁 routes/ (API Endpoints & Pages)
+│  │  ├─ 📄 __init__.py
+│  │  ├─ 📄 main.py                 ← Dashboard routes & stats API
+│  │  ├─ 📄 employees.py            ← Employee CRUD operations
+│  │  ├─ 📄 analytics.py            ← Performance & analytics API
+│  │  ├─ 📄 payments.py             ← Payment tracking API
+│  │  └─ 📄 reports.py              ← Report generation & CSV export
+│  │
+│  ├─ 📁 static/ (Frontend Assets)
+│  │  ├─ 📁 css/
+│  │  │  └─ 📄 style.css            ← Complete styling (14KB+)
+│  │  └─ 📁 js/
+│  │     └─ 📄 main.js              ← JavaScript utilities & functions
+│  │
+│  └─ 📁 templates/ (HTML Pages)
+│     ├─ 📄 base.html               ← Base template with navigation
+│     ├─ 📄 dashboard.html          ← Main dashboard with charts
+│     ├─ 📄 employees.html          ← Employee management page
+│     ├─ 📄 analytics.html          ← Performance analytics page
+│     ├─ 📄 payments.html           ← Payment tracking page
+│     └─ 📄 reports.html            ← Report generation page
+│
+├─ 📁 scripts/ (Utilities & Integration)
+│  ├─ 📄 import_sample_data.py      ← Creates 30 sample employees
+│  ├─ 📄 google_sheets_integration.py ← Python sync with Google Sheets
+│  └─ 📄 GoogleAppsScript.gs        ← Google Apps Script automation
+│
+├─ 📁 config/ (Configuration Files)
+│  └─ 📄 credentials.example.json   ← Google API credentials template
+│     └─ ⚠️  Rename to credentials.json after adding your keys
+│
+├─ 📁 data/ (Database - Auto-created)
+│  └─ 📄 axis_ops.db                ← SQLite database (created on first run)
+│
+└─ 📁 venv/ (Virtual Environment - Auto-created)
+   └─ Python packages installed here
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                           DATA FLOW DIAGRAM                                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────┐
+│  Google Sheets   │
+│  (Your Data)     │
+└────────┬─────────┘
+         │
+         │ google_sheets_integration.py
+         ↓
+┌──────────────────┐      ┌──────────────────┐
+│  SQLite Database │◄────►│  Flask Backend   │
+│  (axis_ops.db)   │      │  (app/)          │
+└──────────────────┘      └────────┬─────────┘
+                                   │
+                                   │ API Calls
+                                   ↓
+                          ┌──────────────────┐
+                          │  Web Browser     │
+                          │  (Dashboard)     │
+                          └──────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         APPLICATION ARCHITECTURE                             ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           PRESENTATION LAYER                                 │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐           │
+│  │ Dashboard  │  │ Employees  │  │ Analytics  │  │  Payments  │           │
+│  │   Page     │  │    Page    │  │    Page    │  │    Page    │           │
+│  └────────────┘  └────────────┘  └────────────┘  └────────────┘           │
+│       HTML Templates + CSS + JavaScript (Chart.js)                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ↕
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           APPLICATION LAYER                                  │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐           │
+│  │   Main     │  │ Employees  │  │ Analytics  │  │  Payments  │           │
+│  │  Routes    │  │   Routes   │  │   Routes   │  │   Routes   │           │
+│  └────────────┘  └────────────┘  └────────────┘  └────────────┘           │
+│       Flask Routes (API Endpoints & Business Logic)                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ↕
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              DATA LAYER                                      │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐           │
+│  │  Employee  │  │Performance │  │  Payment   │  │ Attendance │           │
+│  │   Model    │  │   Model    │  │   Model    │  │   Model    │           │
+│  └────────────┘  └────────────┘  └────────────┘  └────────────┘           │
+│       SQLAlchemy Models (ORM)                                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    ↕
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           DATABASE LAYER                                     │
+│                        SQLite (axis_ops.db)                                  │
+│  Tables: employees, performance, payments, attendance                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          DATABASE SCHEMA                                     ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────┐
+│         EMPLOYEES Table              │
+├──────────────────────────────────────┤
+│ • id (PK)                            │
+│ • employee_id (unique)               │
+│ • name                               │
+│ • email                              │
+│ • mobile                             │
+│ • shift                              │
+│ • weekoff_day                        │
+│ • supervisor                         │
+│ • status                             │
+│ • is_resident                        │
+│ • is_supervisor                      │
+│ • work_site                          │
+│ • date_of_joining                    │
+│ • accommodation                      │
+│ • training_date                      │
+└──────────────────────────────────────┘
+              │
+              │ One-to-Many
+              ↓
+┌──────────────────────────────────────┐
+│       PERFORMANCE Table              │
+├──────────────────────────────────────┤
+│ • id (PK)                            │
+│ • employee_id (FK)                   │
+│ • total_days_worked                  │
+│ • total_production_hours             │
+│ • quality_percentage                 │
+│ • total_videos                       │
+│ • recorded_date                      │
+└──────────────────────────────────────┘
+
+┌──────────────────────────────────────┐
+│         PAYMENTS Table               │
+├──────────────────────────────────────┤
+│ • id (PK)                            │
+│ • employee_id (FK)                   │
+│ • payment_date                       │
+│ • hours_processed                    │
+│ • amount_transferred                 │
+│ • last_payment_date                  │
+│ • payment_status                     │
+└──────────────────────────────────────┘
+
+┌──────────────────────────────────────┐
+│        ATTENDANCE Table              │
+├──────────────────────────────────────┤
+│ • id (PK)                            │
+│ • employee_id (FK)                   │
+│ • date                               │
+│ • status (Present/Absent/Leave)      │
+│ • hours_worked                       │
+│ • notes                              │
+└──────────────────────────────────────┘
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                        FEATURE MAP                                           ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+🏠 DASHBOARD (/)
+   ├─ Total statistics (employees, hours, quality, payments)
+   ├─ Interactive charts (shifts, supervisors, status, accommodation)
+   ├─ Recent employees list
+   └─ Recent payments list
+
+👥 EMPLOYEES (/employees/)
+   ├─ List all employees with search & filters
+   ├─ Add new employee
+   ├─ Edit employee details
+   ├─ Delete employee
+   └─ View employee profile with related data
+
+📊 ANALYTICS (/analytics/)
+   ├─ Top performers by quality
+   ├─ Top performers by production hours
+   ├─ Supervisor performance comparison
+   ├─ Daily attendance trends
+   └─ Employee attendance ranking
+
+💰 PAYMENTS (/payments/)
+   ├─ Payment summary (total paid, pending)
+   ├─ List all payments with filters
+   ├─ Add payment record
+   ├─ Update payment status
+   └─ View payment history per employee
+
+📄 REPORTS (/reports/)
+   ├─ Employee roster export (CSV)
+   ├─ Performance report export (CSV)
+   ├─ Payment report export (CSV, with date filters)
+   └─ Supervisor team report export (CSV)
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                       API ENDPOINTS SUMMARY                                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Dashboard APIs:
+  GET  /api/dashboard/stats           - Get dashboard statistics
+  GET  /api/dashboard/recent-activity - Get recent activity
+
+Employee APIs:
+  GET  /employees/api/list            - List all employees (with filters)
+  GET  /employees/api/<id>            - Get employee details
+  POST /employees/api/create          - Create new employee
+  PUT  /employees/api/<id>/update     - Update employee
+  DEL  /employees/api/<id>/delete     - Delete employee
+  GET  /employees/api/filters         - Get filter options
+
+Analytics APIs:
+  GET  /analytics/api/performance/overview - Performance metrics
+  GET  /analytics/api/attendance/summary   - Attendance data
+  GET  /analytics/api/trends              - Trend data
+
+Payment APIs:
+  GET  /payments/api/list             - List all payments (with filters)
+  POST /payments/api/create           - Create payment record
+  PUT  /payments/api/<id>/update      - Update payment
+  GET  /payments/api/summary          - Payment summary stats
+  GET  /payments/api/employee/<id>    - Employee payment history
+
+Report APIs:
+  GET  /reports/api/generate/employee-roster      - Generate roster CSV
+  GET  /reports/api/generate/performance-report   - Generate performance CSV
+  GET  /reports/api/generate/payment-report       - Generate payment CSV
+  GET  /reports/api/generate/supervisor-report    - Generate supervisor CSV
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          TECHNOLOGY STACK                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Backend:
+  🐍 Python 3.8+
+  🌶️  Flask 3.0 (Web Framework)
+  🗄️  SQLAlchemy 2.0 (ORM)
+  🔄 Flask-CORS (Cross-Origin Support)
+
+Database:
+  💾 SQLite (Development)
+  🐘 PostgreSQL (Recommended for Production)
+
+Frontend:
+  📄 HTML5
+  🎨 CSS3 (Custom responsive design)
+  ⚡ JavaScript ES6
+  📊 Chart.js (Data visualization)
+  🎭 Font Awesome 6 (Icons)
+
+Integration:
+  📑 Google Sheets API
+  🔧 Google Apps Script
+  🔐 OAuth2 Authentication
+
+Tools & Libraries:
+  📦 pip (Package manager)
+  🌐 venv (Virtual environment)
+  📊 Pandas (Data processing)
+  📅 python-dateutil (Date handling)
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                          KEY FILES EXPLAINED                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+Configuration Files:
+  requirements.txt      → Lists all Python packages needed
+  .gitignore           → Tells Git which files to ignore
+  credentials.json     → Google API credentials (you create this)
+
+Entry Points:
+  run.py               → Starts the Flask development server
+  start.bat            → Automated Windows launcher (easiest!)
+  quick_start.ps1      → PowerShell launcher with error checking
+
+Core Application:
+  app/__init__.py      → Creates and configures the Flask app
+  app/models/          → Database table definitions (what data we store)
+  app/routes/          → URL endpoints and business logic (what the app does)
+  app/templates/       → HTML pages (what users see)
+  app/static/          → CSS and JavaScript (how it looks and behaves)
+
+Utilities:
+  scripts/import_sample_data.py          → Creates test data
+  scripts/google_sheets_integration.py   → Syncs with Google Sheets
+  scripts/GoogleAppsScript.gs            → Automates Google Sheets
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         QUICK START GUIDE                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+For Windows Users (Easiest):
+  1. Double-click: start.bat
+  2. Wait for setup (first time only)
+  3. Browser opens to: http://localhost:5000
+  4. Done! Start tracking employees! 🎉
+
+Manual Method:
+  1. Open PowerShell in this folder
+  2. Run: python -m venv venv
+  3. Run: .\venv\Scripts\activate
+  4. Run: pip install -r requirements.txt
+  5. Run: python scripts\import_sample_data.py
+  6. Run: python run.py
+  7. Open browser: http://localhost:5000
+
+Stopping the Server:
+  • Press CTRL+C in the terminal window
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                       NEXT STEPS AFTER INSTALLATION                          ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+✅ Day 1: Get Familiar
+  □ Run start.bat
+  □ Explore dashboard
+  □ Add a test employee
+  □ View analytics page
+  □ Generate a sample report
+
+✅ Day 2: Real Data
+  □ Setup Google Sheets integration (see SETUP_GUIDE.md)
+  □ Import your actual employee data
+  □ Verify all records imported correctly
+  □ Test sync functionality
+
+✅ Day 3: Customize
+  □ Modify colors in static/css/style.css
+  □ Add your company logo
+  □ Adjust fields as needed
+  □ Configure automatic backups
+
+✅ Ongoing: Daily Use
+  □ Update employee records
+  □ Track performance metrics
+  □ Generate weekly/monthly reports
+  □ Sync with Google Sheets regularly
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                            HELP & SUPPORT                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📚 Documentation:
+  → START_HERE.md - Quick start guide
+  → README.md - Complete documentation
+  → TROUBLESHOOTING.md - Fix common issues
+  → SETUP_GUIDE.md - Detailed setup
+
+🆘 Common Issues:
+  → "Python not found" - See INSTALL_PYTHON.md
+  → Scripts won't run - See TROUBLESHOOTING.md → PowerShell section
+  → Database errors - Delete data/axis_ops.db and reimport
+  → Google Sheets fails - Check credentials.json
+
+💡 Getting Started:
+  1. Read START_HERE.md first
+  2. Run start.bat to launch
+  3. Explore the dashboard
+  4. Check TROUBLESHOOTING.md if stuck
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+                  Made with ❤️ for Axis Operations Team
+                         Version 1.0 | October 2026
+
+═══════════════════════════════════════════════════════════════════════════════

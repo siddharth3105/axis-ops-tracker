@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Axis Ops Tracker{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="container">
+        <nav class="sidebar">
+            <div class="logo">
+                <i class="fas fa-chart-line"></i>
+                <h2>Axis Ops Tracker</h2>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="/" class="{% if request.path == '/' %}active{% endif %}">
+                    <i class="fas fa-home"></i> Dashboard
+                </a></li>
+                <li><a href="/employees/" class="{% if request.path.startswith('/employees') %}active{% endif %}">
+                    <i class="fas fa-users"></i> Employees
+                </a></li>
+                <li><a href="/analytics/" class="{% if request.path.startswith('/analytics') %}active{% endif %}">
+                    <i class="fas fa-chart-bar"></i> Analytics
+                </a></li>
+                <li><a href="/payments/" class="{% if request.path.startswith('/payments') %}active{% endif %}">
+                    <i class="fas fa-money-bill-wave"></i> Payments
+                </a></li>
+                <li><a href="/reports/" class="{% if request.path.startswith('/reports') %}active{% endif %}">
+                    <i class="fas fa-file-alt"></i> Reports
+                </a></li>
+            </ul>
+            <div class="sidebar-footer">
+                <p><i class="fas fa-info-circle"></i> v1.0.0</p>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <header class="header">
+                <h1>{% block header %}Axis Ops Tracker{% endblock %}</h1>
+                <div class="header-actions">
+                    <button class="btn-sync" onclick="syncWithSheets()">
+                        <i class="fas fa-sync"></i> Sync with Sheets
+                    </button>
+                    <div class="user-info">
+                        <i class="fas fa-user-circle"></i>
+                        <span>Admin</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

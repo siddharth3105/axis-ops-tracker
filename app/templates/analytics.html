@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - Axis Ops Tracker{% endblock %}
+{% block header %}Performance Analytics{% endblock %}
+
+{% block content %}
+<div class="analytics-page">
+    <div class="analytics-grid">
+        <div class="chart-card-large">
+            <h3><i class="fas fa-trophy"></i> Top Performers by Quality</h3>
+            <div id="top-quality-list" class="performers-list"></div>
+        </div>
+
+        <div class="chart-card-large">
+            <h3><i class="fas fa-clock"></i> Top Performers by Production Hours</h3>
+            <div id="top-production-list" class="performers-list"></div>
+        </div>
+    </div>
+
+    <div class="chart-card-full">
+        <h3><i class="fas fa-users-cog"></i> Supervisor Performance Overview</h3>
+        <canvas id="supervisorPerformanceChart"></canvas>
+    </div>
+
+    <div class="analytics-grid">
+        <div class="chart-card">
+            <h3><i class="fas fa-calendar-check"></i> Daily Attendance (Last 30 Days)</h3>
+            <canvas id="attendanceChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+            <h3><i class="fas fa-user-clock"></i> Employee Attendance Ranking</h3>
+            <div id="attendance-ranking" class="ranking-list"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+let analyticsCharts = {};
+
+async function loadAnalytics() {
+    try {
+        // Load performance overview
+        const perfResponse = await fetch('/analytics/api/performance/overview');
+        const perfData = await perfResponse.json();
+        
+        if (perfData.success) {
+            displayTopQuality(perfData.top_quality);
+            displayTopProduction(perfData.top_production);
+            createSupervisorPerformanceChart(perfData.supervisor_performance);
+        }
+        
+        // Load attendance summary
+        const attResponse = await fetch('/analytics/api/attendance/summary');
+        const attData = await attResponse.json();
+        
+        if (attData.success) {
+            createAttendanceChart(attData.daily_attendance);
+            displayAttendanceRanking(attData.employee_attendance);
+        }
+    } catch (error) {
+        console.error('Error loading analytics:', error);
+        showNotification('Error loading analytics', 'error');
+    }
+}
+
+function displayTopQuality(performers) {
+    const container = document.getElementById('top-quality-list');
+    container.innerHTML = performers.map((p, i) => `
+        <div class="performer-item">
+            <div class="rank">${i + 1}</div>
+            <div class="performer-info">
+                <strong>${p.name}</strong>
+                <small>${p.employee_id}</small>
+            </div>
+            <div class="performer-stats">
+                <span class="stat-badge quality">${p.quality.toFixed(1)}%</span>
+                <span class="stat-badge">${p.hours.toFixed(1)}h</span>
+                <span class="stat-badge">${p.videos} videos</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function displayTopProduction(performers) {
+    const container = document.getElementById('top-production-list');
+    container.innerHTML = performers.map((p, i) => `
+        <div class="performer-item">
+            <div class="rank">${i + 1}</div>
+            <div class="performer-info">
+                <strong>${p.name}</strong>
+                <small>${p.employee_id}</small>
+            </div>
+            <div class="performer-stats">
+                <span class="stat-badge production">${p.hours.toFixed(1)}h</span>
+                <span class="stat-badge">${p.quality.toFixed(1)}%</span>
+                <span class="stat-badge">${p.videos} videos</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function createSupervisorPerformanceChart(data) {
+    const ctx = document.getElementById('supervisorPerformanceChart').getContext('2d');
+    if (analyticsCharts.supervisor) analyticsCharts.supervisor.destroy();
+    
+    analyticsCharts.supervisor = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.map(d => d.supervisor),
+            datasets: [
+                {
+                    label: 'Avg Quality %',
+                    data: data.map(d => d.avg_quality),
+                    backgroundColor: '#4CAF50',
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Total Hours',
+                    data: data.map(d => d.total_hours),
+                    backgroundColor: '#2196F3',
+                    yAxisID: 'y1'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: { display: true, text: 'Quality %' }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: { display: true, text: 'Total Hours' },
+                    grid: { drawOnChartArea: false }
+                }
+            }
+        }
+    });
+}
+
+function createAttendanceChart(data) {
+    const ctx = document.getElementById('attendanceChart').getContext('2d');
+    if (analyticsCharts.attendance) analyticsCharts.attendance.destroy();
+    
+    analyticsCharts.attendance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(d => new Date(d.date).toLocaleDateString()),
+            datasets: [{
+                label: 'Present Count',
+                data: data.map(d => d.present_count),
+                borderColor: '#4CAF50',
+                backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+function displayAttendanceRanking(data) {
+    const container = document.getElementById('attendance-ranking');
+    container.innerHTML = data.slice(0, 10).map((emp, i) => `
+        <div class="ranking-item">
+            <div class="rank">${i + 1}</div>
+            <div class="ranking-info">
+                <strong>${emp.name}</strong>
+                <small>${emp.employee_id}</small>
+            </div>
+            <div class="ranking-stats">
+                <span class="stat-badge">${emp.days_present} days</span>
+                <span class="stat-badge">${emp.total_hours.toFixed(1)}h</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+document.addEventListener('DOMContentLoaded', loadAnalytics);
+</script>
+{% endblock %}

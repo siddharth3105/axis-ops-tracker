@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Axis Ops Tracker{% endblock %}
+{% block header %}Dashboard Overview{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #4CAF50;">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="total-employees">0</h3>
+                <p>Total Employees</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #2196F3;">
+                <i class="fas fa-user-check"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="active-employees">0</h3>
+                <p>Active Employees</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #FF9800;">
+                <i class="fas fa-user-tie"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="total-supervisors">0</h3>
+                <p>Supervisors</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #9C27B0;">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="total-hours">0</h3>
+                <p>Production Hours</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #F44336;">
+                <i class="fas fa-star"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="avg-quality">0%</h3>
+                <p>Avg Quality</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #00BCD4;">
+                <i class="fas fa-rupee-sign"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="total-paid">₹0</h3>
+                <p>Total Paid</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h3>Shift Distribution</h3>
+            <canvas id="shiftChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+            <h3>Supervisor Distribution</h3>
+            <canvas id="supervisorChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+            <h3>Employee Status</h3>
+            <canvas id="statusChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+            <h3>Accommodation Status</h3>
+            <canvas id="accommodationChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="activity-section">
+        <div class="activity-card">
+            <h3><i class="fas fa-user-plus"></i> Recent Employees</h3>
+            <div id="recent-employees" class="activity-list">
+                <p class="loading">Loading...</p>
+            </div>
+        </div>
+
+        <div class="activity-card">
+            <h3><i class="fas fa-money-bill"></i> Recent Payments</h3>
+            <div id="recent-payments" class="activity-list">
+                <p class="loading">Loading...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let charts = {};
+
+async function loadDashboard() {
+    try {
+        // Load stats
+        const statsResponse = await fetch('/api/dashboard/stats');
+        const statsData = await statsResponse.json();
+        
+        if (statsData.success) {
+            const stats = statsData.stats;
+            
+            // Update stat cards
+            document.getElementById('total-employees').textContent = stats.employees.total;
+            document.getElementById('active-employees').textContent = stats.employees.active;
+            document.getElementById('total-supervisors').textContent = stats.hierarchy.supervisors;
+            document.getElementById('total-hours').textContent = stats.performance.total_production_hours.toLocaleString();
+            document.getElementById('avg-quality').textContent = stats.performance.avg_quality.toFixed(1) + '%';
+            document.getElementById('total-paid').textContent = '₹' + stats.payments.total_paid.toLocaleString();
+            
+            // Create charts
+            createShiftChart(stats.shifts);
+            createSupervisorChart(stats.hierarchy.supervisor_distribution);
+            createStatusChart(stats.employees);
+            createAccommodationChart(stats.accommodation);
+        }
+        
+        // Load recent activity
+        const activityResponse = await fetch('/api/dashboard/recent-activity');
+        const activityData = await activityResponse.json();
+        
+        if (activityData.success) {
+            displayRecentEmployees(activityData.recent_employees);
+            displayRecentPayments(activityData.recent_payments);
+        }
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+        showNotification('Error loading dashboard data', 'error');
+    }
+}
+
+function createShiftChart(data) {
+    const ctx = document.getElementById('shiftChart').getContext('2d');
+    if (charts.shift) charts.shift.destroy();
+    
+    charts.shift = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(data),
+            datasets: [{
+                data: Object.values(data),
+                backgroundColor: ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true
+        }
+    });
+}
+
+function createSupervisorChart(data) {
+    const ctx = document.getElementById('supervisorChart').getContext('2d');
+    if (charts.supervisor) charts.supervisor.destroy();
+    
+    charts.supervisor = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(data),
+            datasets: [{
+                label: 'Team Size',
+                data: Object.values(data),
+                backgroundColor: '#2196F3'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+function createStatusChart(data) {
+    const ctx = document.getElementById('statusChart').getContext('2d');
+    if (charts.status) charts.status.destroy();
+    
+    charts.status = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Active', 'Inactive'],
+            datasets: [{
+                data: [data.active, data.inactive],
+                backgroundColor: ['#4CAF50', '#F44336']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true
+        }
+    });
+}
+
+function createAccommodationChart(data) {
+    const ctx = document.getElementById('accommodationChart').getContext('2d');
+    if (charts.accommodation) charts.accommodation.destroy();
+    
+    charts.accommodation = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: ['Residents', 'Non-Residents'],
+            datasets: [{
+                data: [data.residents, data.non_residents],
+                backgroundColor: ['#9C27B0', '#00BCD4']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true
+        }
+    });
+}
+
+function displayRecentEmployees(employees) {
+    const container = document.getElementById('recent-employees');
+    if (employees.length === 0) {
+        container.innerHTML = '<p class="no-data">No recent employees</p>';
+        return;
+    }
+    
+    container.innerHTML = employees.map(emp => `
+        <div class="activity-item">
+            <div class="activity-icon"><i class="fas fa-user"></i></div>
+            <div class="activity-details">
+                <strong>${emp.name}</strong>
+                <small>${emp.employee_id} - ${emp.email}</small>
+            </div>
+        </div>
+    `).join('');
+}
+
+function displayRecentPayments(payments) {
+    const container = document.getElementById('recent-payments');
+    if (payments.length === 0) {
+        container.innerHTML = '<p class="no-data">No recent payments</p>';
+        return;
+    }
+    
+    container.innerHTML = payments.map(pay => `
+        <div class="activity-item">
+            <div class="activity-icon"><i class="fas fa-rupee-sign"></i></div>
+            <div class="activity-details">
+                <strong>₹${pay.amount_transferred.toLocaleString()}</strong>
+                <small>${pay.hours_processed} hours - ${pay.payment_status}</small>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Load dashboard on page load
+document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
+{% endblock %}

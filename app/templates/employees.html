@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}Employees - Axis Ops Tracker{% endblock %}
+{% block header %}Employee Management{% endblock %}
+
+{% block content %}
+<div class="employees-page">
+    <div class="page-header">
+        <div class="filters">
+            <input type="text" id="search-input" placeholder="Search employees..." class="search-input">
+            <select id="status-filter" class="filter-select">
+                <option value="all">All Status</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+            </select>
+            <select id="supervisor-filter" class="filter-select">
+                <option value="all">All Supervisors</option>
+            </select>
+            <select id="shift-filter" class="filter-select">
+                <option value="all">All Shifts</option>
+            </select>
+        </div>
+        <button class="btn-primary" onclick="showAddEmployeeModal()">
+            <i class="fas fa-plus"></i> Add Employee
+        </button>
+    </div>
+
+    <div class="table-container">
+        <table id="employees-table">
+            <thead>
+                <tr>
+                    <th>Employee ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Mobile</th>
+                    <th>Shift</th>
+                    <th>Supervisor</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="employees-tbody">
+                <tr><td colspan="8" class="loading">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add/Edit Employee Modal -->
+<div id="employee-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modal-title">Add Employee</h2>
+            <span class="close" onclick="closeEmployeeModal()">&times;</span>
+        </div>
+        <form id="employee-form" onsubmit="saveEmployee(event)">
+            <input type="hidden" id="employee-db-id">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="employee_id">Employee ID *</label>
+                    <input type="text" id="employee_id" required>
+                </div>
+                <div class="form-group">
+                    <label for="name">Name *</label>
+                    <input type="text" id="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="mobile">Mobile</label>
+                    <input type="text" id="mobile">
+                </div>
+                <div class="form-group">
+                    <label for="shift">Shift</label>
+                    <select id="shift">
+                        <option value="">Select Shift</option>
+                        <option value="Full Time">Full Time</option>
+                        <option value="Day Shift">Day Shift</option>
+                        <option value="Night Shift">Night Shift</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="weekoff_day">Weekoff Day</label>
+                    <select id="weekoff_day">
+                        <option value="">None</option>
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                        <option value="Sunday">Sunday</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="supervisor">Supervisor</label>
+                    <input type="text" id="supervisor">
+                </div>
+                <div class="form-group">
+                    <label for="work_site">Work Site</label>
+                    <input type="text" id="work_site">
+                </div>
+                <div class="form-group">
+                    <label for="date_of_joining">Date of Joining</label>
+                    <input type="date" id="date_of_joining">
+                </div>
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select id="status">
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="is_resident"> Is Resident
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="is_supervisor"> Is Supervisor
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeEmployeeModal()">Cancel</button>
+                <button type="submit" class="btn-primary">Save Employee</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let currentEmployeeId = null;
+
+async function loadEmployees() {
+    const search = document.getElementById('search-input').value;
+    const status = document.getElementById('status-filter').value;
+    const supervisor = document.getElementById('supervisor-filter').value;
+    const shift = document.getElementById('shift-filter').value;
+    
+    const params = new URLSearchParams({ search, status, supervisor, shift });
+    
+    try {
+        const response = await fetch(`/employees/api/list?${params}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            displayEmployees(data.employees);
+        }
+    } catch (error) {
+        console.error('Error loading employees:', error);
+        showNotification('Error loading employees', 'error');
+    }
+}
+
+function displayEmployees(employees) {
+    const tbody = document.getElementById('employees-tbody');
+    
+    if (employees.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="no-data">No employees found</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = employees.map(emp => `
+        <tr>
+            <td><strong>${emp.employee_id}</strong></td>
+            <td>${emp.name}</td>
+            <td>${emp.email}</td>
+            <td>${emp.mobile || '-'}</td>
+            <td>${emp.shift || '-'}</td>
+            <td>${emp.supervisor || '-'}</td>
+            <td><span class="badge badge-${emp.status.toLowerCase()}">${emp.status}</span></td>
+            <td class="actions">
+                <button onclick="editEmployee(${emp.id})" class="btn-icon" title="Edit">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button onclick="deleteEmployee(${emp.id})" class="btn-icon btn-danger" title="Delete">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function showAddEmployeeModal() {
+    document.getElementById('modal-title').textContent = 'Add Employee';
+    document.getElementById('employee-form').reset();
+    document.getElementById('employee-db-id').value = '';
+    currentEmployeeId = null;
+    document.getElementById('employee-modal').style.display = 'flex';
+}
+
+function closeEmployeeModal() {
+    document.getElementById('employee-modal').style.display = 'none';
+}
+
+async function saveEmployee(event) {
+    event.preventDefault();
+    
+    const formData = {
+        employee_id: document.getElementById('employee_id').value,
+        name: document.getElementById('name').value,
+        email: document.getElementById('email').value,
+        mobile: document.getElementById('mobile').value,
+        shift: document.getElementById('shift').value,
+        weekoff_day: document.getElementById('weekoff_day').value,
+        supervisor: document.getElementById('supervisor').value,
+        work_site: document.getElementById('work_site').value,
+        date_of_joining: document.getElementById('date_of_joining').value,
+        status: document.getElementById('status').value,
+        is_resident: document.getElementById('is_resident').checked,
+        is_supervisor: document.getElementById('is_supervisor').checked
+    };
+    
+    const dbId = document.getElementById('employee-db-id').value;
+    const url = dbId ? `/employees/api/${dbId}/update` : '/employees/api/create';
+    const method = dbId ? 'PUT' : 'POST';
+    
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification(data.message, 'success');
+            closeEmployeeModal();
+            loadEmployees();
+        } else {
+            showNotification(data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error saving employee:', error);
+        showNotification('Error saving employee', 'error');
+    }
+}
+
+async function editEmployee(id) {
+    try {
+        const response = await fetch(`/employees/api/${id}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const emp = data.employee;
+            document.getElementById('modal-title').textContent = 'Edit Employee';
+            document.getElementById('employee-db-id').value = emp.id;
+            document.getElementById('employee_id').value = emp.employee_id;
+            document.getElementById('name').value = emp.name;
+            document.getElementById('email').value = emp.email;
+            document.getElementById('mobile').value = emp.mobile || '';
+            document.getElementById('shift').value = emp.shift || '';
+            document.getElementById('weekoff_day').value = emp.weekoff_day || '';
+            document.getElementById('supervisor').value = emp.supervisor || '';
+            document.getElementById('work_site').value = emp.work_site || '';
+            document.getElementById('date_of_joining').value = emp.date_of_joining || '';
+            document.getElementById('status').value = emp.status;
+            document.getElementById('is_resident').checked = emp.is_resident;
+            document.getElementById('is_supervisor').checked = emp.is_supervisor;
+            
+            document.getElementById('employee-modal').style.display = 'flex';
+        }
+    } catch (error) {
+        console.error('Error loading employee:', error);
+        showNotification('Error loading employee', 'error');
+    }
+}
+
+async function deleteEmployee(id) {
+    if (!confirm('Are you sure you want to delete this employee?')) return;
+    
+    try {
+        const response = await fetch(`/employees/api/${id}/delete`, { method: 'DELETE' });
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification(data.message, 'success');
+            loadEmployees();
+        } else {
+            showNotification(data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting employee:', error);
+        showNotification('Error deleting employee', 'error');
+    }
+}
+
+async function loadFilters() {
+    try {
+        const response = await fetch('/employees/api/filters');
+        const data = await response.json();
+        
+        if (data.success) {
+            const supervisorSelect = document.getElementById('supervisor-filter');
+            supervisorSelect.innerHTML = '<option value="all">All Supervisors</option>' +
+                data.supervisors.map(s => `<option value="${s}">${s}</option>`).join('');
+            
+            const shiftSelect = document.getElementById('shift-filter');
+            shiftSelect.innerHTML = '<option value="all">All Shifts</option>' +
+                data.shifts.map(s => `<option value="${s}">${s}</option>`).join('');
+        }
+    } catch (error) {
+        console.error('Error loading filters:', error);
+    }
+}
+
+// Event listeners
+document.getElementById('search-input').addEventListener('input', debounce(loadEmployees, 500));
+document.getElementById('status-filter').addEventListener('change', loadEmployees);
+document.getElementById('supervisor-filter').addEventListener('change', loadEmployees);
+document.getElementById('shift-filter').addEventListener('change', loadEmployees);
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', () => {
+    loadFilters();
+    loadEmployees();
+});
+</script>
+{% endblock %}

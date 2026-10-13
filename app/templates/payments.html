@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}Payments - Axis Ops Tracker{% endblock %}
+{% block header %}Payment Management{% endblock %}
+
+{% block content %}
+<div class="payments-page">
+    <div class="payment-summary">
+        <div class="summary-card">
+            <h4>Total Paid</h4>
+            <h2 id="total-paid-amount">₹0</h2>
+        </div>
+        <div class="summary-card">
+            <h4>Pending Amount</h4>
+            <h2 id="pending-amount">₹0</h2>
+        </div>
+        <div class="summary-card">
+            <h4>Completed Payments</h4>
+            <h2 id="completed-count">0</h2>
+        </div>
+        <div class="summary-card">
+            <h4>Pending Payments</h4>
+            <h2 id="pending-count">0</h2>
+        </div>
+    </div>
+
+    <div class="page-header">
+        <div class="filters">
+            <select id="payment-status-filter" class="filter-select">
+                <option value="all">All Payments</option>
+                <option value="Completed">Completed</option>
+                <option value="Pending">Pending</option>
+                <option value="Processing">Processing</option>
+            </select>
+        </div>
+        <button class="btn-primary" onclick="showAddPaymentModal()">
+            <i class="fas fa-plus"></i> Add Payment
+        </button>
+    </div>
+
+    <div class="table-container">
+        <table id="payments-table">
+            <thead>
+                <tr>
+                    <th>Employee ID</th>
+                    <th>Employee Name</th>
+                    <th>Payment Date</th>
+                    <th>Hours Processed</th>
+                    <th>Amount (₹)</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="payments-tbody">
+                <tr><td colspan="7" class="loading">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div id="payment-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Add Payment</h2>
+            <span class="close" onclick="closePaymentModal()">&times;</span>
+        </div>
+        <form id="payment-form" onsubmit="savePayment(event)">
+            <input type="hidden" id="payment-id">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="payment-employee">Employee *</label>
+                    <select id="payment-employee" required>
+                        <option value="">Select Employee</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="payment-date">Payment Date *</label>
+                    <input type="date" id="payment-date" required>
+                </div>
+                <div class="form-group">
+                    <label for="hours-processed">Hours Processed</label>
+                    <input type="number" id="hours-processed" step="0.1" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="amount-transferred">Amount (₹) *</label>
+                    <input type="number" id="amount-transferred" step="0.01" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="payment-status">Status</label>
+                    <select id="payment-status-select">
+                        <option value="Pending">Pending</option>
+                        <option value="Processing">Processing</option>
+                        <option value="Completed">Completed</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closePaymentModal()">Cancel</button>
+                <button type="submit" class="btn-primary">Save Payment</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+async function loadPayments() {
+    const status = document.getElementById('payment-status-filter').value;
+    
+    try {
+        const response = await fetch(`/payments/api/list?status=${status}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            displayPayments(data.payments);
+        }
+        
+        // Load summary
+        const summaryResponse = await fetch('/payments/api/summary');
+        const summaryData = await summaryResponse.json();
+        
+        if (summaryData.success) {
+            displayPaymentSummary(summaryData.summary);
+        }
+    } catch (error) {
+        console.error('Error loading payments:', error);
+        showNotification('Error loading payments', 'error');
+    }
+}
+
+function displayPayments(payments) {
+    const tbody = document.getElementById('payments-tbody');
+    
+    if (payments.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="no-data">No payments found</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = payments.map(pay => `
+        <tr>
+            <td><strong>${pay.employee_code}</strong></td>
+            <td>${pay.employee_name}</td>
+            <td>${pay.payment_date ? new Date(pay.payment_date).toLocaleDateString() : '-'}</td>
+            <td>${pay.hours_processed.toFixed(1)}h</td>
+            <td>₹${pay.amount_transferred.toLocaleString()}</td>
+            <td><span class="badge badge-${pay.payment_status.toLowerCase()}">${pay.payment_status}</span></td>
+            <td class="actions">
+                <button onclick="editPayment(${pay.id})" class="btn-icon" title="Edit">
+                    <i class="fas fa-edit"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function displayPaymentSummary(summary) {
+    document.getElementById('total-paid-amount').textContent = '₹' + summary.total_paid.toLocaleString();
+    document.getElementById('pending-amount').textContent = '₹' + summary.pending_amount.toLocaleString();
+    
+    const completed = summary.status_breakdown.find(s => s.status === 'Completed');
+    const pending = summary.status_breakdown.find(s => s.status === 'Pending');
+    
+    document.getElementById('completed-count').textContent = completed ? completed.count : 0;
+    document.getElementById('pending-count').textContent = pending ? pending.count : 0;
+}
+
+async function showAddPaymentModal() {
+    // Load employees for dropdown
+    const response = await fetch('/employees/api/list');
+    const data = await response.json();
+    
+    if (data.success) {
+        const select = document.getElementById('payment-employee');
+        select.innerHTML = '<option value="">Select Employee</option>' +
+            data.employees.map(emp => 
+                `<option value="${emp.id}">${emp.employee_id} - ${emp.name}</option>`
+            ).join('');
+    }
+    
+    document.getElementById('payment-form').reset();
+    document.getElementById('payment-id').value = '';
+    document.getElementById('payment-modal').style.display = 'flex';
+}
+
+function closePaymentModal() {
+    document.getElementById('payment-modal').style.display = 'none';
+}
+
+async function savePayment(event) {
+    event.preventDefault();
+    
+    const formData = {
+        employee_id: document.getElementById('payment-employee').value,
+        payment_date: document.getElementById('payment-date').value,
+        hours_processed: document.getElementById('hours-processed').value,
+        amount_transferred: document.getElementById('amount-transferred').value,
+        payment_status: document.getElementById('payment-status-select').value
+    };
+    
+    const paymentId = document.getElementById('payment-id').value;
+    const url = paymentId ? `/payments/api/${paymentId}/update` : '/payments/api/create';
+    const method = paymentId ? 'PUT' : 'POST';
+    
+    try {
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification(data.message, 'success');
+            closePaymentModal();
+            loadPayments();
+        } else {
+            showNotification(data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error saving payment:', error);
+        showNotification('Error saving payment', 'error');
+    }
+}
+
+document.getElementById('payment-status-filter').addEventListener('change', loadPayments);
+document.addEventListener('DOMContentLoaded', loadPayments);
+</script>
+{% endblock %}
