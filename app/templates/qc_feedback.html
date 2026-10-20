@@ -1,0 +1,461 @@
+{% extends "base.html" %}
+
+{% block title %}QC Feedback - Axis Ops Tracker{% endblock %}
+{% block header %}Video Quality Control Feedback{% endblock %}
+
+{% block content %}
+<div class="qc-feedback">
+    <!-- Summary Stats -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #4CAF50;">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="approved-count">0</h3>
+                <p>Approved</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #F44336;">
+                <i class="fas fa-times-circle"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="rejected-count">0</h3>
+                <p>Rejected</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #FF9800;">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="pending-count">0</h3>
+                <p>Pending Review</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #2196F3;">
+                <i class="fas fa-percentage"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="avg-approval">0%</h3>
+                <p>Avg Approval Rate</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-section">
+        <h3><i class="fas fa-filter"></i> Filter Feedback</h3>
+        <div class="filters-grid">
+            <select id="filter-status">
+                <option value="all">All Status</option>
+                <option value="Pending">Pending</option>
+                <option value="Approved">Approved</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Trimmed">Trimmed</option>
+            </select>
+            <input type="date" id="filter-start-date" placeholder="Start Date">
+            <input type="date" id="filter-end-date" placeholder="End Date">
+            <button class="btn-primary" onclick="loadFeedback()">
+                <i class="fas fa-search"></i> Filter
+            </button>
+            <button class="btn-success" onclick="showAddModal()">
+                <i class="fas fa-plus"></i> Add Feedback
+            </button>
+        </div>
+    </div>
+
+    <!-- Common Issues Chart -->
+    <div class="chart-section">
+        <h3><i class="fas fa-exclamation-triangle"></i> Top Quality Issues</h3>
+        <canvas id="issuesChart"></canvas>
+    </div>
+
+    <!-- QC Feedback Table -->
+    <div class="table-section">
+        <h3><i class="fas fa-video"></i> QC Feedback Records</h3>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Employee</th>
+                        <th>Task</th>
+                        <th>Duration</th>
+                        <th>Status</th>
+                        <th>Approval %</th>
+                        <th>Issues</th>
+                        <th>Reviewer</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="feedback-table-body">
+                    <tr><td colspan="9" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Top Performers -->
+    <div class="performers-section">
+        <h3><i class="fas fa-star"></i> Top Performers</h3>
+        <div id="top-performers" class="performers-grid">
+            <p class="loading">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div id="feedbackModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modal-title">Add QC Feedback</h2>
+            <span class="close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="feedback-form">
+                <input type="hidden" id="feedback-id">
+                
+                <div class="form-group">
+                    <label>Employee *</label>
+                    <select id="employee-id" required>
+                        <option value="">Select Employee</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Video ID</label>
+                        <input type="text" id="video-id" placeholder="Video identifier">
+                    </div>
+                    <div class="form-group">
+                        <label>Task Name *</label>
+                        <input type="text" id="task-name" required placeholder="e.g., Folding clothes">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Duration (minutes) *</label>
+                        <input type="number" id="video-duration" step="0.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Recorded Date *</label>
+                        <input type="date" id="recorded-date" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Status *</label>
+                        <select id="qc-status" required>
+                            <option value="Pending">Pending</option>
+                            <option value="Approved">Approved</option>
+                            <option value="Rejected">Rejected</option>
+                            <option value="Trimmed">Trimmed</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Approval % *</label>
+                        <input type="number" id="approval-percentage" min="0" max="100" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Quality Issues (Check all that apply)</label>
+                    <div class="checkbox-grid">
+                        <label><input type="checkbox" id="wrist_camera_mismatch"> Wrist Camera Mismatch</label>
+                        <label><input type="checkbox" id="hands_not_visible"> Hands Not Visible</label>
+                        <label><input type="checkbox" id="poor_lighting"> Poor Lighting</label>
+                        <label><input type="checkbox" id="wrong_environment"> Wrong Environment</label>
+                        <label><input type="checkbox" id="shaky_camera"> Shaky/Unstable Camera</label>
+                        <label><input type="checkbox" id="video_too_short"> Video Too Short</label>
+                        <label><input type="checkbox" id="head_cap_not_worn"> Head Cap Not Worn</label>
+                        <label><input type="checkbox" id="wrong_task_selected"> Wrong Task Selected</label>
+                        <label><input type="checkbox" id="video_not_playing"> Video Not Playing/Missing</label>
+                        <label><input type="checkbox" id="wrist_camera_not_worn"> Wrist Camera Not Worn</label>
+                        <label><input type="checkbox" id="blurry_video"> Blurry/Glitching Video</label>
+                        <label><input type="checkbox" id="task_too_slow"> Task Too Slow/Dragging</label>
+                        <label><input type="checkbox" id="irrelevant_video"> Irrelevant/Fake Video</label>
+                        <label><input type="checkbox" id="pretending_working"> Pretending/Acting</label>
+                        <label><input type="checkbox" id="rejected_on_recheck"> Rejected on Re-check</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Reviewer Name</label>
+                    <input type="text" id="qc-reviewer" placeholder="QC Reviewer name">
+                </div>
+
+                <div class="form-group">
+                    <label>Comments</label>
+                    <textarea id="qc-comments" rows="3" placeholder="Additional QC comments"></textarea>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-save"></i> Save Feedback
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="closeModal()">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let issuesChart;
+
+async function loadSummary() {
+    try {
+        const response = await fetch('/qc/api/summary');
+        const data = await response.json();
+        
+        if (data.success) {
+            const summary = data.summary;
+            
+            // Update counts
+            const approved = summary.status_breakdown.find(s => s.status === 'Approved');
+            const rejected = summary.status_breakdown.find(s => s.status === 'Rejected');
+            const pending = summary.status_breakdown.find(s => s.status === 'Pending');
+            
+            document.getElementById('approved-count').textContent = approved ? approved.count : 0;
+            document.getElementById('rejected-count').textContent = rejected ? rejected.count : 0;
+            document.getElementById('pending-count').textContent = pending ? pending.count : 0;
+            
+            const avgApproval = summary.status_breakdown.reduce((sum, s) => sum + (s.avg_approval || 0), 0) / summary.status_breakdown.length || 0;
+            document.getElementById('avg-approval').textContent = avgApproval.toFixed(1) + '%';
+            
+            // Create issues chart
+            createIssuesChart(summary.top_issues);
+            
+            // Display top performers
+            displayTopPerformers(summary.employee_performance);
+        }
+    } catch (error) {
+        console.error('Error loading summary:', error);
+    }
+}
+
+function createIssuesChart(issues) {
+    const ctx = document.getElementById('issuesChart').getContext('2d');
+    if (issuesChart) issuesChart.destroy();
+    
+    issuesChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: issues.map(i => formatIssueName(i.issue)),
+            datasets: [{
+                label: 'Number of Issues',
+                data: issues.map(i => i.count),
+                backgroundColor: '#F44336'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+function formatIssueName(name) {
+    return name.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function displayTopPerformers(performers) {
+    const container = document.getElementById('top-performers');
+    
+    if (performers.length === 0) {
+        container.innerHTML = '<p class="no-data">No data available</p>';
+        return;
+    }
+    
+    container.innerHTML = performers.slice(0, 5).map(p => `
+        <div class="performer-card">
+            <div class="performer-icon">
+                <i class="fas fa-user-check"></i>
+            </div>
+            <div class="performer-info">
+                <strong>${p.name}</strong>
+                <small>${p.employee_id}</small>
+                <div class="performer-stats">
+                    <span><i class="fas fa-video"></i> ${p.total_videos} videos</span>
+                    <span><i class="fas fa-check"></i> ${p.approved} approved</span>
+                    <span class="approval-rate">${p.approval_rate.toFixed(1)}%</span>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function loadFeedback() {
+    try {
+        const status = document.getElementById('filter-status').value;
+        const startDate = document.getElementById('filter-start-date').value;
+        const endDate = document.getElementById('filter-end-date').value;
+        
+        const params = new URLSearchParams();
+        if (status !== 'all') params.append('status', status);
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+        
+        const response = await fetch(`/qc/api/list?${params}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            displayFeedback(data.feedback);
+        }
+    } catch (error) {
+        console.error('Error loading feedback:', error);
+    }
+}
+
+function displayFeedback(records) {
+    const tbody = document.getElementById('feedback-table-body');
+    
+    if (records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="no-data">No QC feedback found</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = records.map(record => {
+        const issueCount = Object.values(record.issues).filter(v => v).length;
+        return `
+            <tr>
+                <td>${record.recorded_date || '-'}</td>
+                <td><strong>${record.employee_name}</strong><br><small>${record.employee_code}</small></td>
+                <td>${record.task_name || '-'}</td>
+                <td>${record.video_duration.toFixed(1)} min</td>
+                <td><span class="badge badge-${getStatusColor(record.qc_status)}">${record.qc_status}</span></td>
+                <td><strong>${record.approval_percentage.toFixed(0)}%</strong></td>
+                <td><span class="badge badge-warning">${issueCount} issues</span></td>
+                <td>${record.qc_reviewer || '-'}</td>
+                <td>
+                    <button class="btn-icon" onclick="viewDetails(${record.id})" title="View Details">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn-icon" onclick="editFeedback(${record.id})" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function getStatusColor(status) {
+    const colors = {
+        'Approved': 'success',
+        'Rejected': 'danger',
+        'Pending': 'warning',
+        'Trimmed': 'info'
+    };
+    return colors[status] || 'secondary';
+}
+
+async function showAddModal() {
+    document.getElementById('modal-title').textContent = 'Add QC Feedback';
+    document.getElementById('feedback-form').reset();
+    document.getElementById('feedback-id').value = '';
+    await loadEmployees();
+    document.getElementById('feedbackModal').style.display = 'block';
+}
+
+async function loadEmployees() {
+    try {
+        const response = await fetch('/employees/api/list?status=Active');
+        const data = await response.json();
+        
+        if (data.success) {
+            const select = document.getElementById('employee-id');
+            select.innerHTML = '<option value="">Select Employee</option>' +
+                data.employees.map(e => `<option value="${e.id}">${e.name} (${e.employee_id})</option>`).join('');
+        }
+    } catch (error) {
+        console.error('Error loading employees:', error);
+    }
+}
+
+function closeModal() {
+    document.getElementById('feedbackModal').style.display = 'none';
+}
+
+document.getElementById('feedback-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const formData = {
+        employee_id: document.getElementById('employee-id').value,
+        video_id: document.getElementById('video-id').value,
+        task_name: document.getElementById('task-name').value,
+        video_duration: document.getElementById('video-duration').value,
+        recorded_date: document.getElementById('recorded-date').value,
+        qc_status: document.getElementById('qc-status').value,
+        approval_percentage: document.getElementById('approval-percentage').value,
+        qc_reviewer: document.getElementById('qc-reviewer').value,
+        qc_comments: document.getElementById('qc-comments').value,
+        
+        // Issues
+        wrist_camera_mismatch: document.getElementById('wrist_camera_mismatch').checked,
+        hands_not_visible: document.getElementById('hands_not_visible').checked,
+        poor_lighting: document.getElementById('poor_lighting').checked,
+        wrong_environment: document.getElementById('wrong_environment').checked,
+        shaky_camera: document.getElementById('shaky_camera').checked,
+        video_too_short: document.getElementById('video_too_short').checked,
+        head_cap_not_worn: document.getElementById('head_cap_not_worn').checked,
+        wrong_task_selected: document.getElementById('wrong_task_selected').checked,
+        video_not_playing: document.getElementById('video_not_playing').checked,
+        wrist_camera_not_worn: document.getElementById('wrist_camera_not_worn').checked,
+        blurry_video: document.getElementById('blurry_video').checked,
+        task_too_slow: document.getElementById('task_too_slow').checked,
+        irrelevant_video: document.getElementById('irrelevant_video').checked,
+        pretending_working: document.getElementById('pretending_working').checked,
+        rejected_on_recheck: document.getElementById('rejected_on_recheck').checked
+    };
+    
+    try {
+        const response = await fetch('/qc/api/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('QC feedback saved successfully', 'success');
+            closeModal();
+            loadSummary();
+            loadFeedback();
+        } else {
+            showNotification('Error: ' + data.error, 'error');
+        }
+    } catch (error) {
+        showNotification('Error saving feedback', 'error');
+    }
+});
+
+// Close modal when clicking outside
+window.onclick = (event) => {
+    const modal = document.getElementById('feedbackModal');
+    if (event.target == modal) {
+        closeModal();
+    }
+};
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', () => {
+    loadSummary();
+    loadFeedback();
+});
+</script>
+{% endblock %}

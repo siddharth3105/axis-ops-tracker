@@ -22,6 +22,12 @@
                 <li><a href="/employees/" class="{% if request.path.startswith('/employees') %}active{% endif %}">
                     <i class="fas fa-users"></i> Employees
                 </a></li>
+                <li><a href="/attendance/" class="{% if request.path.startswith('/attendance') %}active{% endif %}">
+                    <i class="fas fa-qrcode"></i> Attendance
+                </a></li>
+                <li><a href="/qc/" class="{% if request.path.startswith('/qc') %}active{% endif %}">
+                    <i class="fas fa-video"></i> QC Feedback
+                </a></li>
                 <li><a href="/analytics/" class="{% if request.path.startswith('/analytics') %}active{% endif %}">
                     <i class="fas fa-chart-bar"></i> Analytics
                 </a></li>

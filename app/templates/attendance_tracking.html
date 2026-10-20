@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance Tracking - Axis Ops Tracker{% endblock %}
+{% block header %}QR-Based Attendance Tracking{% endblock %}
+
+{% block content %}
+<div class="attendance-tracker">
+    <!-- Summary Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #4CAF50;">
+                <i class="fas fa-sign-in-alt"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="today-checked-in">0</h3>
+                <p>Checked In Today</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #2196F3;">
+                <i class="fas fa-sign-out-alt"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="today-checked-out">0</h3>
+                <p>Checked Out</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #FF9800;">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="still-working">0</h3>
+                <p>Still Working</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-section">
+        <h3><i class="fas fa-filter"></i> Filter Records</h3>
+        <div class="filters-grid">
+            <input type="date" id="filter-start-date" placeholder="Start Date">
+            <input type="date" id="filter-end-date" placeholder="End Date">
+            <select id="filter-status">
+                <option value="all">All Status</option>
+                <option value="Checked In">Checked In</option>
+                <option value="Checked Out">Checked Out</option>
+                <option value="Auto Checkout">Auto Checkout</option>
+            </select>
+            <button class="btn-primary" onclick="loadAttendance()">
+                <i class="fas fa-search"></i> Filter
+            </button>
+            <button class="btn-secondary" onclick="clearFilters()">
+                <i class="fas fa-times"></i> Clear
+            </button>
+        </div>
+    </div>
+
+    <!-- Attendance Records Table -->
+    <div class="table-section">
+        <h3><i class="fas fa-list"></i> Attendance Records</h3>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Employee</th>
+                        <th>Check In</th>
+                        <th>Check Out</th>
+                        <th>Hours</th>
+                        <th>Work Site</th>
+                        <th>Status</th>
+                        <th>Valid</th>
+                    </tr>
+                </thead>
+                <tbody id="attendance-table-body">
+                    <tr><td colspan="8" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadSummary() {
+    try {
+        const response = await fetch('/attendance/api/summary');
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('today-checked-in').textContent = data.summary.today_checked_in;
+            document.getElementById('today-checked-out').textContent = data.summary.today_checked_out;
+            document.getElementById('still-working').textContent = data.summary.today_still_working;
+        }
+    } catch (error) {
+        console.error('Error loading summary:', error);
+    }
+}
+
+async function loadAttendance() {
+    try {
+        const startDate = document.getElementById('filter-start-date').value;
+        const endDate = document.getElementById('filter-end-date').value;
+        const status = document.getElementById('filter-status').value;
+        
+        const params = new URLSearchParams();
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+        if (status !== 'all') params.append('status', status);
+        
+        const response = await fetch(`/attendance/api/list?${params}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            displayAttendance(data.records);
+        }
+    } catch (error) {
+        console.error('Error loading attendance:', error);
+    }
+}
+
+function displayAttendance(records) {
+    const tbody = document.getElementById('attendance-table-body');
+    
+    if (records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="no-data">No attendance records found</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = records.map(record => `
+        <tr>
+            <td>${record.attendance_date}</td>
+            <td><strong>${record.employee_name}</strong><br><small>${record.employee_code}</small></td>
+            <td>${formatTime(record.check_in_time)}</td>
+            <td>${record.check_out_time ? formatTime(record.check_out_time) : '-'}</td>
+            <td>${record.hours_worked ? record.hours_worked.toFixed(2) + 'h' : '-'}</td>
+            <td>${record.work_site_id || '-'}</td>
+            <td><span class="badge badge-${getStatusColor(record.status)}">${record.status}</span></td>
+            <td><span class="badge badge-${record.is_valid ? 'success' : 'danger'}">${record.is_valid ? 'Valid' : 'Invalid'}</span></td>
+        </tr>
+    `).join('');
+}
+
+function formatTime(timeStr) {
+    if (!timeStr) return '-';
+    const date = new Date(timeStr);
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function getStatusColor(status) {
+    const colors = {
+        'Checked In': 'warning',
+        'Checked Out': 'success',
+        'Auto Checkout': 'info'
+    };
+    return colors[status] || 'secondary';
+}
+
+function clearFilters() {
+    document.getElementById('filter-start-date').value = '';
+    document.getElementById('filter-end-date').value = '';
+    document.getElementById('filter-status').value = 'all';
+    loadAttendance();
+}
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', () => {
+    loadSummary();
+    loadAttendance();
+});
+</script>
+{% endblock %}

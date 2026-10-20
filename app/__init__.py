@@ -27,23 +27,51 @@ def create_app():
     CORS(app)
 
     # Register blueprints
-    from app.routes import main, employees, analytics, payments, reports
+    from app.routes import main, employees, analytics, payments, reports, attendance_tracking, qc_feedback
     app.register_blueprint(main.bp)
     app.register_blueprint(employees.bp)
     app.register_blueprint(analytics.bp)
     app.register_blueprint(payments.bp)
     app.register_blueprint(reports.bp)
+    app.register_blueprint(attendance_tracking.bp)
+    app.register_blueprint(qc_feedback.bp)
 
-    # Sync stub so the "Sync with Sheets" button in the UI doesn't 404
+    # Google Sheets sync endpoint
     @app.route('/api/sync/sheets', methods=['POST'])
-    def sync_sheets_stub():
-        return jsonify({
-            'success': False,
-            'error': (
-                'Google Sheets sync requires credentials.json. '
-                'See SETUP_GUIDE.md Section 2 to configure it.'
-            )
-        }), 501
+    def sync_sheets():
+        try:
+            from app.utils.google_sheets import GoogleSheetsSync
+            
+            sync = GoogleSheetsSync()
+            result = sync.sync_all()
+            
+            if result['success']:
+                return jsonify({
+                    'success': True,
+                    'message': 'Data synced successfully to Google Sheets',
+                    'synced': result['synced'],
+                    'spreadsheet_url': GoogleSheetsSync.SPREADSHEET_URL
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': result.get('error', 'Sync failed'),
+                    'synced': result.get('synced', []),
+                    'errors': result.get('errors', [])
+                }), 500
+                
+        except FileNotFoundError as e:
+            return jsonify({
+                'success': False,
+                'error': str(e),
+                'setup_required': True,
+                'instructions': 'See GOOGLE_SHEETS_SETUP.md for setup instructions'
+            }), 400
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'Sync error: {str(e)}'
+            }), 500
 
     # Create database tables
     with app.app_context():
