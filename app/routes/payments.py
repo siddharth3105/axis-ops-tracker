@@ -70,6 +70,15 @@ def create_payment():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@bp.route('/api/<int:payment_id>')
+def get_payment(payment_id):
+    try:
+        payment = Payment.query.get_or_404(payment_id)
+        return jsonify({'success': True, 'payment': payment.to_dict()})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @bp.route('/api/<int:payment_id>/update', methods=['PUT'])
 def update_payment(payment_id):
     try:

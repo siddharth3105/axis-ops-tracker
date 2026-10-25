@@ -223,6 +223,39 @@ async function savePayment(event) {
     }
 }
 
+async function editPayment(id) {
+    try {
+        // Load employees for dropdown
+        const empResponse = await fetch('/employees/api/list');
+        const empData = await empResponse.json();
+        if (empData.success) {
+            const select = document.getElementById('payment-employee');
+            select.innerHTML = '<option value="">Select Employee</option>' +
+                empData.employees.map(emp =>
+                    `<option value="${emp.id}">${emp.employee_id} - ${emp.name}</option>`
+                ).join('');
+        }
+
+        // Fetch single payment
+        const response = await fetch(`/payments/api/${id}`);
+        const data = await response.json();
+        if (data.success) {
+            const pay = data.payment;
+            document.getElementById('payment-id').value = pay.id;
+            document.getElementById('payment-employee').value = pay.employee_id;
+            document.getElementById('payment-date').value = pay.payment_date || '';
+            document.getElementById('hours-processed').value = pay.hours_processed;
+            document.getElementById('amount-transferred').value = pay.amount_transferred;
+            document.getElementById('payment-status-select').value = pay.payment_status;
+            document.querySelector('#payment-modal .modal-header h2').textContent = 'Edit Payment';
+            document.getElementById('payment-modal').style.display = 'flex';
+        }
+    } catch (error) {
+        console.error('Error loading payment:', error);
+        showNotification('Error loading payment', 'error');
+    }
+}
+
 document.getElementById('payment-status-filter').addEventListener('change', loadPayments);
 document.addEventListener('DOMContentLoaded', loadPayments);
 </script>

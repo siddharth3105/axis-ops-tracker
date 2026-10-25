@@ -252,6 +252,22 @@ window.addEventListener('offline', () => {
     showNotification('No internet connection', 'error');
 });
 
+// CSV download helper — used by reports.html and anywhere else that generates CSV
+function downloadCSV(csvContent, filename) {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (navigator.msSaveBlob) {
+        navigator.msSaveBlob(blob, filename);
+    } else {
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
 // Console welcome message
 console.log('%cAxis Ops Tracker', 'font-size: 24px; font-weight: bold; color: #2196F3;');
 console.log('%cVersion 1.0.0', 'font-size: 12px; color: #666;');

@@ -266,6 +266,76 @@ def list_work_sites():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@bp.route('/api/add-manual', methods=['POST'])
+def add_manual_attendance():
+    """Manually add / edit an attendance record (admin use)"""
+    try:
+        data = request.get_json() or {}
+        record_id = data.get('id')
+
+        attendance_date_str = data.get('attendance_date')
+        if not attendance_date_str:
+            return jsonify({'success': False, 'error': 'attendance_date is required'}), 400
+        attendance_date = datetime.strptime(attendance_date_str, '%Y-%m-%d').date()
+
+        employee_id = int(data.get('employee_id', 0))
+        if not employee_id:
+            return jsonify({'success': False, 'error': 'employee_id is required'}), 400
+
+        check_in_str  = data.get('check_in_time')
+        check_out_str = data.get('check_out_time')
+
+        check_in_time  = datetime.strptime(check_in_str,  '%H:%M') if check_in_str  else datetime.now()
+        # Combine date + time
+        check_in_dt  = datetime.combine(attendance_date, check_in_time.time())
+        check_out_dt = datetime.combine(attendance_date, datetime.strptime(check_out_str, '%H:%M').time()) if check_out_str else None
+
+        hours_worked = None
+        if check_out_dt:
+            hours_worked = (check_out_dt - check_in_dt).total_seconds() / 3600
+
+        if record_id:
+            record = AttendanceRecord.query.get_or_404(int(record_id))
+        else:
+            # Check for duplicate on same day
+            existing = AttendanceRecord.query.filter_by(
+                employee_id=employee_id, attendance_date=attendance_date).first()
+            if existing:
+                record = existing  # update existing
+            else:
+                record = AttendanceRecord(employee_id=employee_id, attendance_date=attendance_date,
+                                          check_in_time=check_in_dt, status='Checked Out')
+                db.session.add(record)
+
+        record.check_in_time  = check_in_dt
+        record.check_out_time = check_out_dt
+        record.hours_worked   = round(hours_worked, 2) if hours_worked is not None else None
+        record.status         = data.get('status', 'Checked Out' if check_out_dt else 'Checked In')
+        record.work_site_id   = data.get('work_site_id', 'Manual')
+        record.is_valid       = True
+        record.validation_message = 'Manually added'
+
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Attendance saved', 'attendance': record.to_dict()}), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/api/<int:record_id>/delete', methods=['DELETE'])
+def delete_attendance(record_id):
+    """Delete an attendance record"""
+    try:
+        record = AttendanceRecord.query.get_or_404(record_id)
+        db.session.delete(record)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Attendance record deleted'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 def calculate_distance(lat1, lon1, lat2, lon2):
     """Calculate distance between two GPS coordinates in meters"""
     R = 6371000  # Earth's radius in meters

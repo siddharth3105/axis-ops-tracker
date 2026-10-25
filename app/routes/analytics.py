@@ -2,7 +2,7 @@
 Analytics and performance tracking routes
 SQLite-compatible (strftime instead of date_trunc)
 """
-from flask import Blueprint, render_template, jsonify
+from flask import Blueprint, render_template, jsonify, request
 from app.models import Employee, Performance, Attendance
 from app import db
 from sqlalchemy import func, desc
@@ -139,4 +139,36 @@ def trends():
             'quality_trend':   [{'month': r[0], 'avg_quality': round(float(r[1] or 0), 2)} for r in quality_trend]
         })
     except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/api/performance/update', methods=['POST'])
+def update_performance():
+    """Update or create performance record for an employee"""
+    try:
+        data = request.get_json() or {}
+        employee_id = int(data.get('employee_id', 0))
+        if not employee_id:
+            return jsonify({'success': False, 'error': 'employee_id is required'}), 400
+
+        perf = Performance.query.filter_by(employee_id=employee_id).first()
+        if not perf:
+            perf = Performance(employee_id=employee_id)
+            db.session.add(perf)
+
+        if 'total_days_worked' in data:
+            perf.total_days_worked = int(data['total_days_worked'])
+        if 'total_production_hours' in data:
+            perf.total_production_hours = float(data['total_production_hours'])
+        if 'quality_percentage' in data:
+            perf.quality_percentage = float(data['quality_percentage'])
+        if 'total_videos' in data:
+            perf.total_videos = int(data['total_videos'])
+        perf.recorded_date = datetime.utcnow()
+
+        db.session.commit()
+        return jsonify({'success': True, 'performance': perf.to_dict(),
+                        'message': 'Performance updated successfully'})
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500

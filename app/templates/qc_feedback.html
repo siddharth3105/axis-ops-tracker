@@ -16,7 +16,6 @@
                 <p>Approved</p>
             </div>
         </div>
-
         <div class="stat-card">
             <div class="stat-icon" style="background: #F44336;">
                 <i class="fas fa-times-circle"></i>
@@ -26,7 +25,6 @@
                 <p>Rejected</p>
             </div>
         </div>
-
         <div class="stat-card">
             <div class="stat-icon" style="background: #FF9800;">
                 <i class="fas fa-clock"></i>
@@ -36,7 +34,6 @@
                 <p>Pending Review</p>
             </div>
         </div>
-
         <div class="stat-card">
             <div class="stat-icon" style="background: #2196F3;">
                 <i class="fas fa-percentage"></i>
@@ -59,8 +56,8 @@
                 <option value="Rejected">Rejected</option>
                 <option value="Trimmed">Trimmed</option>
             </select>
-            <input type="date" id="filter-start-date" placeholder="Start Date">
-            <input type="date" id="filter-end-date" placeholder="End Date">
+            <input type="date" id="filter-start-date">
+            <input type="date" id="filter-end-date">
             <button class="btn-primary" onclick="loadFeedback()">
                 <i class="fas fa-search"></i> Filter
             </button>
@@ -73,7 +70,7 @@
     <!-- Common Issues Chart -->
     <div class="chart-section">
         <h3><i class="fas fa-exclamation-triangle"></i> Top Quality Issues</h3>
-        <canvas id="issuesChart"></canvas>
+        <canvas id="issuesChart" height="80"></canvas>
     </div>
 
     <!-- QC Feedback Table -->
@@ -110,9 +107,9 @@
     </div>
 </div>
 
-<!-- Add/Edit Modal -->
-<div id="feedbackModal" class="modal">
-    <div class="modal-content">
+<!-- Add / Edit Modal -->
+<div id="feedbackModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width:700px;">
         <div class="modal-header">
             <h2 id="modal-title">Add QC Feedback</h2>
             <span class="close" onclick="closeModal()">&times;</span>
@@ -120,7 +117,7 @@
         <div class="modal-body">
             <form id="feedback-form">
                 <input type="hidden" id="feedback-id">
-                
+
                 <div class="form-group">
                     <label>Employee *</label>
                     <select id="employee-id" required>
@@ -142,7 +139,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Duration (minutes) *</label>
-                        <input type="number" id="video-duration" step="0.1" required>
+                        <input type="number" id="video-duration" step="0.1" min="0" required>
                     </div>
                     <div class="form-group">
                         <label>Recorded Date *</label>
@@ -210,81 +207,84 @@
     </div>
 </div>
 
+<!-- View Details Modal -->
+<div id="detailModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width:650px;">
+        <div class="modal-header">
+            <h2>QC Feedback Details</h2>
+            <span class="close" onclick="closeDetailModal()">&times;</span>
+        </div>
+        <div class="modal-body" id="detail-content">
+            <p class="loading">Loading...</p>
+        </div>
+    </div>
+</div>
+
 <script>
 let issuesChart;
+const ISSUE_LABELS = {
+    wrist_camera_mismatch: 'Wrist Cam Mismatch',
+    hands_not_visible:     'Hands Not Visible',
+    poor_lighting:         'Poor Lighting',
+    wrong_environment:     'Wrong Environment',
+    shaky_camera:          'Shaky Camera',
+    video_too_short:       'Too Short',
+    head_cap_not_worn:     'No Head Cap',
+    wrong_task_selected:   'Wrong Task',
+    video_not_playing:     'Not Playing',
+    wrist_camera_not_worn: 'No Wrist Cam',
+    blurry_video:          'Blurry',
+    task_too_slow:         'Too Slow',
+    irrelevant_video:      'Irrelevant',
+    pretending_working:    'Pretending',
+    rejected_on_recheck:   'Rejected Recheck'
+};
 
 async function loadSummary() {
     try {
         const response = await fetch('/qc/api/summary');
         const data = await response.json();
-        
-        if (data.success) {
-            const summary = data.summary;
-            
-            // Update counts
-            const approved = summary.status_breakdown.find(s => s.status === 'Approved');
-            const rejected = summary.status_breakdown.find(s => s.status === 'Rejected');
-            const pending = summary.status_breakdown.find(s => s.status === 'Pending');
-            
-            document.getElementById('approved-count').textContent = approved ? approved.count : 0;
-            document.getElementById('rejected-count').textContent = rejected ? rejected.count : 0;
-            document.getElementById('pending-count').textContent = pending ? pending.count : 0;
-            
-            const avgApproval = summary.status_breakdown.reduce((sum, s) => sum + (s.avg_approval || 0), 0) / summary.status_breakdown.length || 0;
-            document.getElementById('avg-approval').textContent = avgApproval.toFixed(1) + '%';
-            
-            // Create issues chart
-            createIssuesChart(summary.top_issues);
-            
-            // Display top performers
-            displayTopPerformers(summary.employee_performance);
-        }
-    } catch (error) {
-        console.error('Error loading summary:', error);
-    }
+        if (!data.success) return;
+        const summary = data.summary;
+
+        const approved = summary.status_breakdown.find(s => s.status === 'Approved');
+        const rejected = summary.status_breakdown.find(s => s.status === 'Rejected');
+        const pending  = summary.status_breakdown.find(s => s.status === 'Pending');
+
+        document.getElementById('approved-count').textContent = approved ? approved.count : 0;
+        document.getElementById('rejected-count').textContent = rejected ? rejected.count : 0;
+        document.getElementById('pending-count').textContent  = pending  ? pending.count  : 0;
+
+        const total   = summary.status_breakdown.reduce((s, x) => s + x.count, 0);
+        const wtdAvg  = total > 0
+            ? summary.status_breakdown.reduce((s, x) => s + (x.avg_approval || 0) * x.count, 0) / total
+            : 0;
+        document.getElementById('avg-approval').textContent = wtdAvg.toFixed(1) + '%';
+
+        createIssuesChart(summary.top_issues);
+        displayTopPerformers(summary.employee_performance);
+    } catch (error) { console.error('Error loading summary:', error); }
 }
 
 function createIssuesChart(issues) {
     const ctx = document.getElementById('issuesChart').getContext('2d');
     if (issuesChart) issuesChart.destroy();
-    
     issuesChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: issues.map(i => formatIssueName(i.issue)),
-            datasets: [{
-                label: 'Number of Issues',
-                data: issues.map(i => i.count),
-                backgroundColor: '#F44336'
-            }]
+            labels: issues.map(i => ISSUE_LABELS[i.issue] || i.issue),
+            datasets: [{ label: 'Number of Issues', data: issues.map(i => i.count), backgroundColor: '#F44336' }]
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            scales: {
-                y: { beginAtZero: true }
-            }
-        }
+        options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
     });
-}
-
-function formatIssueName(name) {
-    return name.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
 function displayTopPerformers(performers) {
     const container = document.getElementById('top-performers');
-    
-    if (performers.length === 0) {
-        container.innerHTML = '<p class="no-data">No data available</p>';
-        return;
-    }
-    
-    container.innerHTML = performers.slice(0, 5).map(p => `
+    if (!performers.length) { container.innerHTML = '<p class="no-data">No data available</p>'; return; }
+    container.innerHTML = performers.slice(0, 6).map(p => `
         <div class="performer-card">
-            <div class="performer-icon">
-                <i class="fas fa-user-check"></i>
-            </div>
+            <div class="performer-icon"><i class="fas fa-user-check"></i></div>
             <div class="performer-info">
                 <strong>${p.name}</strong>
                 <small>${p.employee_id}</small>
@@ -300,162 +300,191 @@ function displayTopPerformers(performers) {
 
 async function loadFeedback() {
     try {
-        const status = document.getElementById('filter-status').value;
+        const status    = document.getElementById('filter-status').value;
         const startDate = document.getElementById('filter-start-date').value;
-        const endDate = document.getElementById('filter-end-date').value;
-        
-        const params = new URLSearchParams();
+        const endDate   = document.getElementById('filter-end-date').value;
+        const params    = new URLSearchParams();
         if (status !== 'all') params.append('status', status);
         if (startDate) params.append('start_date', startDate);
-        if (endDate) params.append('end_date', endDate);
-        
+        if (endDate)   params.append('end_date',   endDate);
+
         const response = await fetch(`/qc/api/list?${params}`);
         const data = await response.json();
-        
-        if (data.success) {
-            displayFeedback(data.feedback);
-        }
-    } catch (error) {
-        console.error('Error loading feedback:', error);
-    }
+        if (data.success) displayFeedback(data.feedback);
+    } catch (error) { console.error('Error loading feedback:', error); }
 }
 
 function displayFeedback(records) {
     const tbody = document.getElementById('feedback-table-body');
-    
-    if (records.length === 0) {
+    if (!records.length) {
         tbody.innerHTML = '<tr><td colspan="9" class="no-data">No QC feedback found</td></tr>';
         return;
     }
-    
-    tbody.innerHTML = records.map(record => {
-        const issueCount = Object.values(record.issues).filter(v => v).length;
+    tbody.innerHTML = records.map(r => {
+        const issueCount = Object.values(r.issues).filter(Boolean).length;
         return `
-            <tr>
-                <td>${record.recorded_date || '-'}</td>
-                <td><strong>${record.employee_name}</strong><br><small>${record.employee_code}</small></td>
-                <td>${record.task_name || '-'}</td>
-                <td>${record.video_duration.toFixed(1)} min</td>
-                <td><span class="badge badge-${getStatusColor(record.qc_status)}">${record.qc_status}</span></td>
-                <td><strong>${record.approval_percentage.toFixed(0)}%</strong></td>
-                <td><span class="badge badge-warning">${issueCount} issues</span></td>
-                <td>${record.qc_reviewer || '-'}</td>
-                <td>
-                    <button class="btn-icon" onclick="viewDetails(${record.id})" title="View Details">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                    <button class="btn-icon" onclick="editFeedback(${record.id})" title="Edit">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
+        <tr>
+            <td>${r.recorded_date || '-'}</td>
+            <td><strong>${r.employee_name}</strong><br><small>${r.employee_code}</small></td>
+            <td>${r.task_name || '-'}</td>
+            <td>${r.video_duration.toFixed(1)} min</td>
+            <td><span class="badge badge-${getStatusColor(r.qc_status)}">${r.qc_status}</span></td>
+            <td><strong>${r.approval_percentage.toFixed(0)}%</strong></td>
+            <td><span class="badge badge-${issueCount > 0 ? 'warning' : 'success'}">${issueCount} issue${issueCount !== 1 ? 's' : ''}</span></td>
+            <td>${r.qc_reviewer || '-'}</td>
+            <td class="actions">
+                <button class="btn-icon" onclick="viewDetails(${r.id})" title="View Details">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button class="btn-icon" onclick="editFeedback(${r.id})" title="Edit">
+                    <i class="fas fa-edit"></i>
+                </button>
+            </td>
+        </tr>`;
     }).join('');
 }
 
 function getStatusColor(status) {
-    const colors = {
-        'Approved': 'success',
-        'Rejected': 'danger',
-        'Pending': 'warning',
-        'Trimmed': 'info'
-    };
-    return colors[status] || 'secondary';
+    return { Approved: 'success', Rejected: 'danger', Pending: 'warning', Trimmed: 'info' }[status] || 'secondary';
 }
+
+async function viewDetails(id) {
+    document.getElementById('detail-content').innerHTML = '<p class="loading">Loading...</p>';
+    document.getElementById('detailModal').style.display = 'flex';
+    try {
+        const response = await fetch(`/qc/api/${id}`);
+        const data = await response.json();
+        if (!data.success) { document.getElementById('detail-content').innerHTML = '<p class="no-data">Error loading details</p>'; return; }
+        const r = data.feedback;
+        const activeIssues = Object.entries(r.issues).filter(([, v]) => v).map(([k]) => ISSUE_LABELS[k] || k);
+        document.getElementById('detail-content').innerHTML = `
+            <div class="detail-panel">
+                <div class="detail-row"><span class="detail-label">Employee</span><span>${r.employee_name} (${r.employee_code})</span></div>
+                <div class="detail-row"><span class="detail-label">Video ID</span><span>${r.video_id || '-'}</span></div>
+                <div class="detail-row"><span class="detail-label">Task</span><span>${r.task_name || '-'}</span></div>
+                <div class="detail-row"><span class="detail-label">Duration</span><span>${r.video_duration.toFixed(1)} min</span></div>
+                <div class="detail-row"><span class="detail-label">Recorded Date</span><span>${r.recorded_date || '-'}</span></div>
+                <div class="detail-row"><span class="detail-label">Status</span><span><span class="badge badge-${getStatusColor(r.qc_status)}">${r.qc_status}</span></span></div>
+                <div class="detail-row"><span class="detail-label">Approval %</span><span><strong>${r.approval_percentage.toFixed(0)}%</strong></span></div>
+                <div class="detail-row"><span class="detail-label">Reviewer</span><span>${r.qc_reviewer || '-'}</span></div>
+                <div class="detail-row"><span class="detail-label">Comments</span><span>${r.qc_comments || '-'}</span></div>
+                <div class="detail-row"><span class="detail-label">Submitted</span><span>${r.submitted_date ? new Date(r.submitted_date).toLocaleString() : '-'}</span></div>
+                <div class="detail-row">
+                    <span class="detail-label">Issues Found (${activeIssues.length})</span>
+                    <div class="issues-list">${activeIssues.length ? activeIssues.map(i => `<span class="issue-tag">${i}</span>`).join('') : '<span style="color:#4CAF50">None</span>'}</div>
+                </div>
+            </div>
+        `;
+    } catch (error) { document.getElementById('detail-content').innerHTML = '<p class="no-data">Error loading details</p>'; }
+}
+
+function closeDetailModal() { document.getElementById('detailModal').style.display = 'none'; }
 
 async function showAddModal() {
     document.getElementById('modal-title').textContent = 'Add QC Feedback';
     document.getElementById('feedback-form').reset();
     document.getElementById('feedback-id').value = '';
+    document.getElementById('recorded-date').value = new Date().toISOString().slice(0, 10);
     await loadEmployees();
-    document.getElementById('feedbackModal').style.display = 'block';
+    document.getElementById('feedbackModal').style.display = 'flex';
+}
+
+async function editFeedback(id) {
+    try {
+        const response = await fetch(`/qc/api/${id}`);
+        const data = await response.json();
+        if (!data.success) { showNotification('Error loading feedback', 'error'); return; }
+        const r = data.feedback;
+
+        await loadEmployees();
+        document.getElementById('modal-title').textContent   = 'Edit QC Feedback';
+        document.getElementById('feedback-id').value         = r.id;
+        document.getElementById('employee-id').value         = r.employee_id;
+        document.getElementById('video-id').value            = r.video_id || '';
+        document.getElementById('task-name').value           = r.task_name || '';
+        document.getElementById('video-duration').value      = r.video_duration;
+        document.getElementById('recorded-date').value       = r.recorded_date || '';
+        document.getElementById('qc-status').value           = r.qc_status;
+        document.getElementById('approval-percentage').value = r.approval_percentage;
+        document.getElementById('qc-reviewer').value         = r.qc_reviewer || '';
+        document.getElementById('qc-comments').value         = r.qc_comments || '';
+
+        // Populate checkboxes from issues object
+        Object.entries(r.issues).forEach(([key, val]) => {
+            const el = document.getElementById(key);
+            if (el) el.checked = Boolean(val);
+        });
+
+        document.getElementById('feedbackModal').style.display = 'flex';
+    } catch (error) { showNotification('Error loading feedback', 'error'); }
 }
 
 async function loadEmployees() {
     try {
         const response = await fetch('/employees/api/list?status=Active');
         const data = await response.json();
-        
         if (data.success) {
-            const select = document.getElementById('employee-id');
-            select.innerHTML = '<option value="">Select Employee</option>' +
+            const sel = document.getElementById('employee-id');
+            const current = sel.value;
+            sel.innerHTML = '<option value="">Select Employee</option>' +
                 data.employees.map(e => `<option value="${e.id}">${e.name} (${e.employee_id})</option>`).join('');
+            if (current) sel.value = current;
         }
-    } catch (error) {
-        console.error('Error loading employees:', error);
-    }
+    } catch (error) { console.error('Error loading employees:', error); }
 }
 
-function closeModal() {
-    document.getElementById('feedbackModal').style.display = 'none';
-}
+function closeModal() { document.getElementById('feedbackModal').style.display = 'none'; }
 
 document.getElementById('feedback-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    
+    const id = document.getElementById('feedback-id').value;
     const formData = {
-        employee_id: document.getElementById('employee-id').value,
-        video_id: document.getElementById('video-id').value,
-        task_name: document.getElementById('task-name').value,
-        video_duration: document.getElementById('video-duration').value,
-        recorded_date: document.getElementById('recorded-date').value,
-        qc_status: document.getElementById('qc-status').value,
+        employee_id:       document.getElementById('employee-id').value,
+        video_id:          document.getElementById('video-id').value,
+        task_name:         document.getElementById('task-name').value,
+        video_duration:    document.getElementById('video-duration').value,
+        recorded_date:     document.getElementById('recorded-date').value,
+        qc_status:         document.getElementById('qc-status').value,
         approval_percentage: document.getElementById('approval-percentage').value,
-        qc_reviewer: document.getElementById('qc-reviewer').value,
-        qc_comments: document.getElementById('qc-comments').value,
-        
-        // Issues
+        qc_reviewer:       document.getElementById('qc-reviewer').value,
+        qc_comments:       document.getElementById('qc-comments').value,
         wrist_camera_mismatch: document.getElementById('wrist_camera_mismatch').checked,
         hands_not_visible: document.getElementById('hands_not_visible').checked,
-        poor_lighting: document.getElementById('poor_lighting').checked,
+        poor_lighting:     document.getElementById('poor_lighting').checked,
         wrong_environment: document.getElementById('wrong_environment').checked,
-        shaky_camera: document.getElementById('shaky_camera').checked,
-        video_too_short: document.getElementById('video_too_short').checked,
+        shaky_camera:      document.getElementById('shaky_camera').checked,
+        video_too_short:   document.getElementById('video_too_short').checked,
         head_cap_not_worn: document.getElementById('head_cap_not_worn').checked,
         wrong_task_selected: document.getElementById('wrong_task_selected').checked,
         video_not_playing: document.getElementById('video_not_playing').checked,
         wrist_camera_not_worn: document.getElementById('wrist_camera_not_worn').checked,
-        blurry_video: document.getElementById('blurry_video').checked,
-        task_too_slow: document.getElementById('task_too_slow').checked,
-        irrelevant_video: document.getElementById('irrelevant_video').checked,
+        blurry_video:      document.getElementById('blurry_video').checked,
+        task_too_slow:     document.getElementById('task_too_slow').checked,
+        irrelevant_video:  document.getElementById('irrelevant_video').checked,
         pretending_working: document.getElementById('pretending_working').checked,
         rejected_on_recheck: document.getElementById('rejected_on_recheck').checked
     };
-    
+
+    const url    = id ? `/qc/api/${id}/update` : '/qc/api/submit';
+    const method = id ? 'PUT' : 'POST';
+
     try {
-        const response = await fetch('/qc/api/submit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(formData)
+        const response = await fetch(url, {
+            method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData)
         });
-        
         const data = await response.json();
-        
         if (data.success) {
             showNotification('QC feedback saved successfully', 'success');
-            closeModal();
-            loadSummary();
-            loadFeedback();
-        } else {
-            showNotification('Error: ' + data.error, 'error');
-        }
-    } catch (error) {
-        showNotification('Error saving feedback', 'error');
-    }
+            closeModal(); loadSummary(); loadFeedback();
+        } else { showNotification('Error: ' + data.error, 'error'); }
+    } catch (error) { showNotification('Error saving feedback', 'error'); }
 });
 
-// Close modal when clicking outside
-window.onclick = (event) => {
-    const modal = document.getElementById('feedbackModal');
-    if (event.target == modal) {
-        closeModal();
-    }
+window.onclick = (e) => {
+    if (e.target === document.getElementById('feedbackModal'))  closeModal();
+    if (e.target === document.getElementById('detailModal'))    closeDetailModal();
 };
 
-// Load data on page load
-document.addEventListener('DOMContentLoaded', () => {
-    loadSummary();
-    loadFeedback();
-});
+document.addEventListener('DOMContentLoaded', () => { loadSummary(); loadFeedback(); });
 </script>
 {% endblock %}
