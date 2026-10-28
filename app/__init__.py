@@ -27,7 +27,8 @@ def create_app():
     CORS(app)
 
     # Register blueprints
-    from app.routes import main, employees, analytics, payments, reports, attendance_tracking, qc_feedback
+    from app.routes import main, employees, analytics, payments, reports, attendance_tracking, qc_feedback, followup
+    from app.routes.ai_call import bp as ai_call_bp
     app.register_blueprint(main.bp)
     app.register_blueprint(employees.bp)
     app.register_blueprint(analytics.bp)
@@ -35,6 +36,8 @@ def create_app():
     app.register_blueprint(reports.bp)
     app.register_blueprint(attendance_tracking.bp)
     app.register_blueprint(qc_feedback.bp)
+    app.register_blueprint(followup.bp)
+    app.register_blueprint(ai_call_bp)
 
     # Google Sheets sync endpoint
     @app.route('/api/sync/sheets', methods=['POST'])

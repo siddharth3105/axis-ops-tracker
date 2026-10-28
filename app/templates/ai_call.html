@@ -1,0 +1,855 @@
+{% extends "base.html" %}
+{% block title %}AI Calling Assistant - Axis Ops Tracker{% endblock %}
+{% block header %}AI Calling Assistant{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── AI Call Page ─────────────────────────────────── */
+.ai-call-page { display: flex; flex-direction: column; gap: 24px; }
+
+/* Summary cards */
+.call-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 16px; }
+
+/* Employee picker */
+.call-launcher {
+    background: white; border-radius: 12px; padding: 28px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.1);
+}
+.call-launcher h3 { margin-bottom: 20px; display:flex; align-items:center; gap:10px; font-size:18px; }
+.launcher-grid { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 14px; align-items: end; }
+.launcher-grid label { font-size:13px; font-weight:600; color:#555; margin-bottom:4px; display:block; }
+.launcher-grid select, .launcher-grid input {
+    width:100%; padding:10px 14px; border:1px solid #ddd;
+    border-radius:8px; font-size:14px; outline:none;
+}
+.launcher-grid select:focus, .launcher-grid input:focus { border-color:#2196F3; }
+@media(max-width:768px){ .launcher-grid { grid-template-columns:1fr; } }
+
+/* Call window */
+.call-window {
+    background: #0f1117; border-radius: 16px; overflow:hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,.3); display:none;
+}
+.call-window.active { display:block; }
+.call-header {
+    background: linear-gradient(135deg,#1a237e,#283593);
+    padding: 20px 28px; display:flex; justify-content:space-between; align-items:center;
+}
+.call-header .call-info h2 { color:white; font-size:20px; margin-bottom:4px; }
+.call-header .call-info p  { color:rgba(255,255,255,.7); font-size:13px; }
+.call-timer { color:white; font-size:28px; font-family:monospace; font-weight:700; }
+.call-status-badge {
+    padding:6px 14px; border-radius:20px; font-size:12px; font-weight:700;
+    background:rgba(76,175,80,.2); color:#81C784; border:1px solid rgba(76,175,80,.3);
+}
+.call-status-badge.listening { background:rgba(33,150,243,.2); color:#64B5F6; border-color:rgba(33,150,243,.3); }
+.call-status-badge.thinking  { background:rgba(255,152,0,.2);  color:#FFB74D; border-color:rgba(255,152,0,.3);  }
+.call-status-badge.speaking  { background:rgba(156,39,176,.2); color:#CE93D8; border-color:rgba(156,39,176,.3); }
+.call-status-badge.ended     { background:rgba(244,67,54,.2);  color:#EF9A9A; border-color:rgba(244,67,54,.3);  }
+
+/* Transcript */
+.transcript-area {
+    height: 380px; overflow-y:auto; padding:20px 28px;
+    display:flex; flex-direction:column; gap:14px;
+    scrollbar-width:thin; scrollbar-color:#333 #0f1117;
+}
+.transcript-area::-webkit-scrollbar { width:6px; }
+.transcript-area::-webkit-scrollbar-track { background:#0f1117; }
+.transcript-area::-webkit-scrollbar-thumb { background:#333; border-radius:3px; }
+
+.msg-bubble { max-width:75%; display:flex; flex-direction:column; gap:4px; }
+.msg-bubble.assistant { align-self:flex-start; }
+.msg-bubble.user      { align-self:flex-end; }
+.msg-role { font-size:11px; font-weight:700; color:rgba(255,255,255,.4); padding:0 6px; }
+.msg-bubble.user .msg-role { text-align:right; color:rgba(33,150,243,.7); }
+.msg-text {
+    padding:12px 16px; border-radius:12px; font-size:14px; line-height:1.5;
+    color:white;
+}
+.msg-bubble.assistant .msg-text { background:#1e2030; border-bottom-left-radius:4px; }
+.msg-bubble.user      .msg-text { background:#1565C0; border-bottom-right-radius:4px; }
+.msg-time { font-size:11px; color:rgba(255,255,255,.3); padding:0 6px; }
+.msg-bubble.user .msg-time { text-align:right; }
+
+/* Typing indicator */
+.typing-indicator {
+    display:none; align-self:flex-start;
+    background:#1e2030; padding:12px 18px; border-radius:12px; border-bottom-left-radius:4px;
+}
+.typing-indicator.visible { display:flex; gap:5px; align-items:center; }
+.typing-dot {
+    width:8px; height:8px; background:#64B5F6; border-radius:50%;
+    animation: typingBounce 1.2s infinite;
+}
+.typing-dot:nth-child(2) { animation-delay:.2s; }
+.typing-dot:nth-child(3) { animation-delay:.4s; }
+@keyframes typingBounce {
+    0%,60%,100% { transform:translateY(0); }
+    30%         { transform:translateY(-8px); }
+}
+
+/* Controls */
+.call-controls {
+    padding:20px 28px; background:#0a0d14;
+    display:flex; justify-content:center; align-items:center; gap:16px; flex-wrap:wrap;
+}
+.ctrl-btn {
+    width:60px; height:60px; border-radius:50%; border:none; cursor:pointer;
+    font-size:20px; display:flex; align-items:center; justify-content:center;
+    transition:all .2s ease; color:white;
+}
+.ctrl-btn:hover { transform:scale(1.1); }
+.ctrl-btn.mic-btn      { background:#2196F3; }
+.ctrl-btn.mic-btn.recording { background:#F44336; animation: pulse-red 1.5s infinite; }
+.ctrl-btn.end-btn      { background:#F44336; width:72px; height:72px; font-size:24px; }
+.ctrl-btn.end-btn:hover{ background:#D32F2F; }
+.ctrl-btn.speaker-btn  { background:#4CAF50; }
+.ctrl-btn.speaker-btn.muted{ background:#757575; }
+@keyframes pulse-red {
+    0%,100%{ box-shadow:0 0 0 0 rgba(244,67,54,.4); }
+    50%    { box-shadow:0 0 0 16px rgba(244,67,54,0); }
+}
+
+.ctrl-label { font-size:12px; color:rgba(255,255,255,.5); text-align:center; margin-top:6px; }
+.ctrl-group { display:flex; flex-direction:column; align-items:center; }
+
+/* Voice visualizer */
+.voice-wave { display:flex; align-items:center; gap:4px; height:40px; }
+.wave-bar {
+    width:4px; background:#2196F3; border-radius:2px;
+    animation:wave 1s ease-in-out infinite;
+    min-height:4px;
+}
+.wave-bar:nth-child(2){ animation-delay:.1s; }
+.wave-bar:nth-child(3){ animation-delay:.2s; }
+.wave-bar:nth-child(4){ animation-delay:.3s; }
+.wave-bar:nth-child(5){ animation-delay:.4s; }
+@keyframes wave {
+    0%,100%{ height:6px; }
+    50%    { height:32px; }
+}
+.voice-wave.inactive .wave-bar { animation:none; height:4px; background:#333; }
+
+/* Call ended panel */
+.call-summary-panel {
+    display:none; background:white; border-radius:12px; padding:28px;
+    box-shadow:0 2px 8px rgba(0,0,0,.1);
+}
+.call-summary-panel.visible { display:block; }
+.summary-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+.summary-header h3 { font-size:20px; display:flex; align-items:center; gap:10px; }
+.outcome-badge {
+    padding:8px 18px; border-radius:20px; font-size:14px; font-weight:700;
+}
+.outcome-Available, .outcome-Active { background:#d4edda; color:#155724; }
+.outcome-On-Leave                   { background:#cce5ff; color:#004085; }
+.outcome-Sick                       { background:#f8d7da; color:#721c24; }
+.outcome-Follow-up-Required         { background:#fff3cd; color:#856404; }
+.outcome-Unresponsive               { background:#e2e3e5; color:#383d41; }
+.summary-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin:20px 0; }
+.summary-stat  { text-align:center; padding:16px; background:#f8f9fa; border-radius:8px; }
+.summary-stat h4 { font-size:24px; font-weight:700; color:#2196F3; }
+.summary-stat p  { font-size:13px; color:#666; margin-top:4px; }
+.transcript-box {
+    background:#f8f9fa; border-radius:8px; padding:16px; max-height:280px;
+    overflow-y:auto; margin-top:16px;
+}
+.transcript-line { padding:8px 0; border-bottom:1px solid #eee; font-size:14px; line-height:1.5; }
+.transcript-line:last-child { border-bottom:none; }
+.transcript-line .tl-role { font-weight:700; margin-right:8px; }
+.transcript-line .tl-role.assistant { color:#2196F3; }
+.transcript-line .tl-role.user      { color:#4CAF50; }
+
+/* History section */
+.history-section {
+    background:white; border-radius:12px; padding:28px;
+    box-shadow:0 2px 8px rgba(0,0,0,.1);
+}
+.history-section h3 { font-size:18px; margin-bottom:16px; display:flex; align-items:center; gap:10px; }
+
+/* Mic permission notice */
+.mic-notice {
+    background:#e3f2fd; border:1px solid #90CAF9; border-radius:8px;
+    padding:14px 18px; font-size:14px; color:#1565C0;
+    display:flex; align-items:center; gap:10px; margin-bottom:16px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ai-call-page">
+
+    <!-- Stats -->
+    <div class="call-stats" id="call-stats-row">
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#2196F3;"><i class="fas fa-robot"></i></div>
+            <div class="stat-info"><h3 id="stat-total">0</h3><p>Total AI Calls</p></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#4CAF50;"><i class="fas fa-check-circle"></i></div>
+            <div class="stat-info"><h3 id="stat-today">0</h3><p>Calls Today</p></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#FF9800;"><i class="fas fa-user-check"></i></div>
+            <div class="stat-info"><h3 id="stat-available">0</h3><p>Available</p></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background:#F44336;"><i class="fas fa-user-times"></i></div>
+            <div class="stat-info"><h3 id="stat-followup">0</h3><p>Need Follow-up</p></div>
+        </div>
+    </div>
+
+    <!-- Call Launcher -->
+    <div class="call-launcher">
+        <h3><i class="fas fa-phone-alt" style="color:#2196F3;"></i> Start AI Call</h3>
+        <div class="mic-notice" id="mic-notice" style="display:none;">
+            <i class="fas fa-microphone"></i>
+            <span>Microphone access required. Your browser will ask for permission when you start a call.</span>
+        </div>
+        <div class="launcher-grid">
+            <div>
+                <label>Select Employee</label>
+                <select id="call-employee-select">
+                    <option value="">Loading employees...</option>
+                </select>
+            </div>
+            <div>
+                <label>Call Purpose</label>
+                <select id="call-purpose-select">
+                    <option value="General Follow-up">General Follow-up</option>
+                    <option value="Attendance Check-in">Attendance Check-in</option>
+                    <option value="QC Feedback Discussion">QC Feedback Discussion</option>
+                    <option value="Payment Query">Payment Query</option>
+                    <option value="Welfare Check">Welfare Check</option>
+                    <option value="Performance Review">Performance Review</option>
+                    <option value="Return to Work">Return to Work</option>
+                </select>
+            </div>
+            <div>
+                <label>&nbsp;</label>
+                <button class="btn-primary" onclick="startCall()" id="start-call-btn">
+                    <i class="fas fa-phone"></i> Start Call
+                </button>
+            </div>
+            <div>
+                <label>&nbsp;</label>
+                <button class="btn-secondary" onclick="showHistory()">
+                    <i class="fas fa-history"></i> History
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Call Window -->
+    <div class="call-window" id="call-window">
+        <div class="call-header">
+            <div class="call-info">
+                <h2 id="call-employee-name">Employee Name</h2>
+                <p id="call-purpose-label">Purpose</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:20px;">
+                <div class="voice-wave inactive" id="voice-wave">
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                </div>
+                <div class="call-timer" id="call-timer">00:00</div>
+                <span class="call-status-badge" id="call-status-badge">Connected</span>
+            </div>
+        </div>
+
+        <div class="transcript-area" id="transcript-area">
+            <!-- Messages appear here -->
+            <div class="typing-indicator" id="typing-indicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+
+        <div class="call-controls">
+            <div class="ctrl-group">
+                <button class="ctrl-btn mic-btn" id="mic-btn" onclick="toggleMic()" title="Hold to speak">
+                    <i class="fas fa-microphone" id="mic-icon"></i>
+                </button>
+                <div class="ctrl-label" id="mic-label">Hold to Speak</div>
+            </div>
+
+            <div class="ctrl-group">
+                <button class="ctrl-btn end-btn" onclick="endCall()" title="End Call">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+                <div class="ctrl-label">End Call</div>
+            </div>
+
+            <div class="ctrl-group">
+                <button class="ctrl-btn speaker-btn" id="speaker-btn" onclick="toggleSpeaker()" title="Toggle speaker">
+                    <i class="fas fa-volume-up" id="speaker-icon"></i>
+                </button>
+                <div class="ctrl-label" id="speaker-label">Speaker On</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call Summary (shown after call ends) -->
+    <div class="call-summary-panel" id="call-summary-panel">
+        <div class="summary-header">
+            <h3><i class="fas fa-check-circle" style="color:#4CAF50;"></i> Call Completed</h3>
+            <span class="outcome-badge" id="summary-outcome-badge">—</span>
+        </div>
+        <div class="summary-stats">
+            <div class="summary-stat">
+                <h4 id="summary-duration">0:00</h4>
+                <p>Duration</p>
+            </div>
+            <div class="summary-stat">
+                <h4 id="summary-turns">0</h4>
+                <p>Exchanges</p>
+            </div>
+            <div class="summary-stat">
+                <h4 id="summary-outcome-text">—</h4>
+                <p>Outcome</p>
+            </div>
+        </div>
+        <p><strong>AI Summary:</strong></p>
+        <div class="transcript-box" id="summary-text" style="margin-bottom:16px;"></div>
+        <p><strong>Full Transcript:</strong></p>
+        <div class="transcript-box" id="summary-transcript"></div>
+        <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;">
+            <button class="btn-primary" onclick="startAnotherCall()">
+                <i class="fas fa-phone"></i> New Call
+            </button>
+            <button class="btn-secondary" onclick="showHistory()">
+                <i class="fas fa-history"></i> View History
+            </button>
+        </div>
+    </div>
+
+    <!-- History Section -->
+    <div class="history-section" id="history-section" style="display:none;">
+        <h3><i class="fas fa-history" style="color:#2196F3;"></i> Call History</h3>
+        <div class="filters-grid" style="margin-bottom:16px;">
+            <select id="hist-emp-filter" onchange="loadHistory()">
+                <option value="">All Employees</option>
+            </select>
+            <button class="btn-primary" onclick="loadHistory()"><i class="fas fa-sync"></i> Refresh</button>
+            <button class="btn-secondary" onclick="document.getElementById('history-section').style.display='none'">
+                <i class="fas fa-times"></i> Close
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Employee</th>
+                        <th>Purpose</th>
+                        <th>Duration</th>
+                        <th>Turns</th>
+                        <th>Outcome</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="history-tbody">
+                    <tr><td colspan="8" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- Transcript Detail Modal -->
+<div id="transcriptModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width:700px;">
+        <div class="modal-header">
+            <h2 id="transcript-modal-title">Call Transcript</h2>
+            <span class="close" onclick="document.getElementById('transcriptModal').style.display='none'">&times;</span>
+        </div>
+        <div class="modal-body" id="transcript-modal-body">
+            <p class="loading">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let currentSessionId  = null;
+let currentEmployeeName = '';
+let callStartTime     = null;
+let timerInterval     = null;
+let mediaRecorder     = null;
+let audioStream       = null;
+let isRecording       = false;
+let speakerEnabled    = true;
+let speechSynth       = window.speechSynthesis;
+let currentUtterance  = null;
+let callEnded         = false;
+let localTranscript   = [];  // [{role, content, time}]
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    loadEmployees();
+    loadStats();
+    // Show mic notice if browser supports it
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        document.getElementById('mic-notice').style.display = 'flex';
+    }
+});
+
+// ─── Load employees into selects ─────────────────────────────────────────────
+async function loadEmployees() {
+    try {
+        const r = await fetch('/employees/api/list?status=Active');
+        const d = await r.json();
+        if (!d.success) return;
+
+        const opts = '<option value="">Select Employee...</option>' +
+            d.employees.map(e => `<option value="${e.id}" data-name="${e.name}">${e.name} (${e.employee_id})</option>`).join('');
+
+        document.getElementById('call-employee-select').innerHTML = opts;
+        document.getElementById('hist-emp-filter').innerHTML =
+            '<option value="">All Employees</option>' +
+            d.employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+    } catch(e) { console.error(e); }
+}
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+async function loadStats() {
+    try {
+        const r = await fetch('/ai-call/api/summary');
+        const d = await r.json();
+        if (!d.success) return;
+        const s = d.summary;
+        document.getElementById('stat-total').textContent = s.total_calls;
+        document.getElementById('stat-today').textContent = s.today_calls;
+        document.getElementById('stat-available').textContent = (s.outcomes['Available'] || 0) + (s.outcomes['Active'] || 0);
+        document.getElementById('stat-followup').textContent = (s.outcomes['Follow-up Required'] || 0) + (s.outcomes['Unresponsive'] || 0);
+    } catch(e) {}
+}
+
+// ─── Start Call ───────────────────────────────────────────────────────────────
+async function startCall() {
+    const empSelect = document.getElementById('call-employee-select');
+    const empId     = empSelect.value;
+    const empName   = empSelect.selectedOptions[0]?.dataset?.name || '';
+    const purpose   = document.getElementById('call-purpose-select').value;
+
+    if (!empId) { showNotification('Please select an employee', 'error'); return; }
+
+    // Request mic permission first
+    try {
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch(e) {
+        showNotification('Microphone permission denied. Please allow mic access and try again.', 'error');
+        return;
+    }
+
+    document.getElementById('start-call-btn').disabled = true;
+    document.getElementById('start-call-btn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting...';
+
+    try {
+        const r = await fetch('/ai-call/api/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ employee_id: empId, purpose })
+        });
+        const d = await r.json();
+        if (!d.success) { showNotification('Error: ' + d.error, 'error'); resetStartBtn(); return; }
+
+        currentSessionId    = d.session_id;
+        currentEmployeeName = d.employee_name;
+        callEnded           = false;
+        localTranscript     = [];
+
+        // Show call window
+        document.getElementById('call-window').classList.add('active');
+        document.getElementById('call-employee-name').textContent = d.employee_name;
+        document.getElementById('call-purpose-label').textContent = purpose;
+        document.getElementById('call-summary-panel').classList.remove('visible');
+        document.getElementById('transcript-area').innerHTML = `
+            <div class="typing-indicator" id="typing-indicator">
+                <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+            </div>`;
+
+        // Start timer
+        callStartTime = Date.now();
+        timerInterval = setInterval(updateTimer, 1000);
+
+        // Show AI opening message
+        setCallStatus('speaking');
+        appendMessage('assistant', d.opening_message);
+        speakText(d.opening_message, () => { setCallStatus('listening'); });
+
+        resetStartBtn();
+    } catch(e) {
+        showNotification('Failed to start call: ' + e.message, 'error');
+        resetStartBtn();
+    }
+}
+
+function resetStartBtn() {
+    const btn = document.getElementById('start-call-btn');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-phone"></i> Start Call';
+}
+
+// ─── Timer ───────────────────────────────────────────────────────────────────
+function updateTimer() {
+    const secs = Math.floor((Date.now() - callStartTime) / 1000);
+    const m = String(Math.floor(secs / 60)).padStart(2, '0');
+    const s = String(secs % 60).padStart(2, '0');
+    document.getElementById('call-timer').textContent = `${m}:${s}`;
+}
+
+// ─── Mic: Hold to record ──────────────────────────────────────────────────────
+function toggleMic() {
+    if (callEnded) return;
+    if (!isRecording) startRecording();
+    else              stopRecording();
+}
+
+function startRecording() {
+    if (!audioStream) return;
+    isRecording = true;
+
+    const btn = document.getElementById('mic-btn');
+    btn.classList.add('recording');
+    document.getElementById('mic-icon').className = 'fas fa-microphone-slash';
+    document.getElementById('mic-label').textContent = 'Recording...';
+    document.getElementById('voice-wave').classList.remove('inactive');
+    setCallStatus('listening');
+
+    const chunks = [];
+    mediaRecorder = new MediaRecorder(audioStream, { mimeType: getSupportedMimeType() });
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+        const blob   = new Blob(chunks, { type: getSupportedMimeType() });
+        const b64    = await blobToBase64(blob);
+        await processUserSpeech(b64, blob.type);
+    };
+    mediaRecorder.start();
+}
+
+function stopRecording() {
+    if (!isRecording || !mediaRecorder) return;
+    isRecording = false;
+
+    const btn = document.getElementById('mic-btn');
+    btn.classList.remove('recording');
+    document.getElementById('mic-icon').className = 'fas fa-microphone';
+    document.getElementById('mic-label').textContent = 'Hold to Speak';
+    document.getElementById('voice-wave').classList.add('inactive');
+    setCallStatus('thinking');
+    mediaRecorder.stop();
+}
+
+function getSupportedMimeType() {
+    const types = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'];
+    for (const t of types) { if (MediaRecorder.isTypeSupported(t)) return t; }
+    return '';
+}
+
+async function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.onerror   = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+// ─── Process speech: transcribe → chat → speak ───────────────────────────────
+async function processUserSpeech(audioB64, mimeType) {
+    showTyping(true);
+
+    try {
+        // 1. Transcribe with Whisper via Groq
+        const trResp = await fetch('/ai-call/api/transcribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ audio: audioB64, mime: mimeType })
+        });
+        const trData = await trResp.json();
+
+        if (!trData.success) {
+            showNotification('Transcription error: ' + trData.error, 'error');
+            showTyping(false); setCallStatus('listening'); return;
+        }
+
+        const userText = trData.transcript?.trim();
+        if (!userText || trData.empty) {
+            showTyping(false);
+            setCallStatus('listening');
+            appendMessage('assistant', "I didn't catch that. Could you please repeat?", true);
+            speakText("I didn't catch that. Could you please repeat?", () => setCallStatus('listening'));
+            return;
+        }
+
+        appendMessage('user', userText);
+
+        // 2. Get AI response from Groq
+        const chatResp = await fetch('/ai-call/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id:    currentSessionId,
+                message:       userText,
+                employee_name: currentEmployeeName
+            })
+        });
+        const chatData = await chatResp.json();
+        showTyping(false);
+
+        if (!chatData.success) {
+            showNotification('AI error: ' + chatData.error, 'error');
+            setCallStatus('listening'); return;
+        }
+
+        appendMessage('assistant', chatData.reply);
+        setCallStatus('speaking');
+        speakText(chatData.reply, () => {
+            setCallStatus('listening');
+            // If AI signalled end of call
+            if (chatData.outcome) {
+                setTimeout(() => endCall(chatData.outcome), 1500);
+            }
+        });
+
+    } catch(e) {
+        showTyping(false);
+        showNotification('Error: ' + e.message, 'error');
+        setCallStatus('listening');
+    }
+}
+
+// ─── Text to Speech (browser built-in, free) ─────────────────────────────────
+function speakText(text, onEnd) {
+    if (!speakerEnabled) { if (onEnd) onEnd(); return; }
+    if (currentUtterance) { speechSynth.cancel(); }
+
+    const clean = text.replace(/\[CALL_OUTCOME:[^\]]+\]/g, '').trim();
+    const utt   = new SpeechSynthesisUtterance(clean);
+    utt.rate    = 0.95;
+    utt.pitch   = 1.0;
+    utt.volume  = 1.0;
+
+    // Pick a natural voice if available
+    const voices = speechSynth.getVoices();
+    const preferred = voices.find(v =>
+        v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha')
+    );
+    if (preferred) utt.voice = preferred;
+
+    utt.onend   = () => { currentUtterance = null; if (onEnd) onEnd(); };
+    utt.onerror = () => { currentUtterance = null; if (onEnd) onEnd(); };
+
+    currentUtterance = utt;
+    document.getElementById('voice-wave').classList.remove('inactive');
+    speechSynth.speak(utt);
+}
+
+function toggleSpeaker() {
+    speakerEnabled = !speakerEnabled;
+    if (!speakerEnabled && currentUtterance) speechSynth.cancel();
+    document.getElementById('speaker-icon').className = speakerEnabled ? 'fas fa-volume-up' : 'fas fa-volume-mute';
+    document.getElementById('speaker-btn').className  = speakerEnabled ? 'ctrl-btn speaker-btn' : 'ctrl-btn speaker-btn muted';
+    document.getElementById('speaker-label').textContent = speakerEnabled ? 'Speaker On' : 'Speaker Off';
+}
+
+// ─── End Call ─────────────────────────────────────────────────────────────────
+async function endCall(autoOutcome) {
+    if (callEnded || !currentSessionId) return;
+    callEnded = true;
+
+    if (currentUtterance) speechSynth.cancel();
+    clearInterval(timerInterval);
+    setCallStatus('ended');
+    document.getElementById('voice-wave').classList.add('inactive');
+
+    if (audioStream) { audioStream.getTracks().forEach(t => t.stop()); audioStream = null; }
+
+    try {
+        const r = await fetch('/ai-call/api/end', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: currentSessionId, outcome: autoOutcome || '' })
+        });
+        const d = await r.json();
+        if (d.success) showCallSummary(d);
+    } catch(e) { showNotification('Error ending call: ' + e.message, 'error'); }
+
+    document.getElementById('call-window').classList.remove('active');
+    loadStats();
+}
+
+function showCallSummary(data) {
+    const panel = document.getElementById('call-summary-panel');
+    panel.classList.add('visible');
+
+    const outcome = data.outcome || 'Completed';
+    const outcomeKey = outcome.replace(/\s+/g, '-');
+    document.getElementById('summary-outcome-badge').textContent  = outcome;
+    document.getElementById('summary-outcome-badge').className    = `outcome-badge outcome-${outcomeKey}`;
+    document.getElementById('summary-outcome-text').textContent   = outcome;
+    document.getElementById('summary-turns').textContent          = data.turns || 0;
+
+    const secs = data.duration || 0;
+    const mm = Math.floor(secs/60), ss = secs%60;
+    document.getElementById('summary-duration').textContent = `${mm}:${String(ss).padStart(2,'0')}`;
+
+    document.getElementById('summary-text').textContent = data.summary || 'No summary available.';
+
+    // Render local transcript
+    const area = document.getElementById('summary-transcript');
+    area.innerHTML = localTranscript.map(m => `
+        <div class="transcript-line">
+            <span class="tl-role ${m.role}">${m.role === 'assistant' ? '🤖 Arya' : '👤 You'}</span>
+            ${m.content}
+        </div>`).join('');
+
+    // Scroll into view
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ─── UI Helpers ───────────────────────────────────────────────────────────────
+function appendMessage(role, content, skipLocal) {
+    if (!skipLocal) localTranscript.push({ role, content, time: new Date().toLocaleTimeString() });
+
+    const area = document.getElementById('transcript-area');
+    const bubble = document.createElement('div');
+    bubble.className = `msg-bubble ${role}`;
+    bubble.innerHTML = `
+        <div class="msg-role">${role === 'assistant' ? '🤖 Arya' : '👤 You'}</div>
+        <div class="msg-text">${escHtml(content)}</div>
+        <div class="msg-time">${new Date().toLocaleTimeString()}</div>`;
+
+    // Insert before typing indicator
+    const typing = document.getElementById('typing-indicator');
+    if (typing) area.insertBefore(bubble, typing);
+    else area.appendChild(bubble);
+
+    area.scrollTop = area.scrollHeight;
+}
+
+function showTyping(show) {
+    const el = document.getElementById('typing-indicator');
+    if (el) el.className = 'typing-indicator' + (show ? ' visible' : '');
+}
+
+function setCallStatus(status) {
+    const badge = document.getElementById('call-status-badge');
+    const labels = {
+        connected:  ['Connected',   ''],
+        listening:  ['Listening…',  'listening'],
+        thinking:   ['Thinking…',   'thinking'],
+        speaking:   ['Speaking…',   'speaking'],
+        ended:      ['Call Ended',  'ended'],
+    };
+    const [text, cls] = labels[status] || ['Connected',''];
+    badge.textContent = text;
+    badge.className   = 'call-status-badge' + (cls ? ' ' + cls : '');
+}
+
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function startAnotherCall() {
+    document.getElementById('call-summary-panel').classList.remove('visible');
+    currentSessionId = null; localTranscript = []; callEnded = false;
+}
+
+// ─── History ──────────────────────────────────────────────────────────────────
+function showHistory() {
+    document.getElementById('history-section').style.display = 'block';
+    loadHistory();
+    document.getElementById('history-section').scrollIntoView({ behavior:'smooth' });
+}
+
+async function loadHistory() {
+    const tbody = document.getElementById('history-tbody');
+    tbody.innerHTML = '<tr><td colspan="8" class="loading">Loading...</td></tr>';
+    try {
+        const empId = document.getElementById('hist-emp-filter').value;
+        const url   = '/ai-call/api/sessions' + (empId ? `?employee_id=${empId}` : '');
+        const r = await fetch(url);
+        const d = await r.json();
+        if (!d.success || !d.sessions.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="no-data">No call sessions yet</td></tr>';
+            return;
+        }
+        tbody.innerHTML = d.sessions.map(s => {
+            const dur  = s.duration_seconds ? `${Math.floor(s.duration_seconds/60)}m ${s.duration_seconds%60}s` : '-';
+            const dt   = s.started_at ? new Date(s.started_at).toLocaleString() : '-';
+            const ocKey= (s.outcome||'').replace(/\s+/g,'-');
+            return `<tr>
+                <td>${dt}</td>
+                <td><strong>${s.employee_name}</strong><br><small>${s.employee_code}</small></td>
+                <td>${s.call_purpose}</td>
+                <td>${dur}</td>
+                <td>${s.turn_count}</td>
+                <td>${s.outcome ? `<span class="badge outcome-${ocKey}" style="padding:4px 10px;border-radius:12px;font-size:12px;">${s.outcome}</span>` : '-'}</td>
+                <td><span class="badge badge-${s.call_status==='Completed'?'success':'warning'}">${s.call_status}</span></td>
+                <td class="actions">
+                    <button class="btn-icon" onclick="viewTranscript(${s.id})" title="View Transcript">
+                        <i class="fas fa-file-alt"></i>
+                    </button>
+                    <button class="btn-icon btn-danger" onclick="deleteSession(${s.id})" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>`;
+        }).join('');
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="8" class="no-data">Error loading history</td></tr>'; }
+}
+
+async function viewTranscript(sessionId) {
+    document.getElementById('transcript-modal-body').innerHTML = '<p class="loading">Loading...</p>';
+    document.getElementById('transcriptModal').style.display = 'flex';
+
+    try {
+        const r = await fetch(`/ai-call/api/sessions/${sessionId}/transcript`);
+        const d = await r.json();
+        if (!d.success) { document.getElementById('transcript-modal-body').innerHTML = '<p class="no-data">Error</p>'; return; }
+
+        const s   = d.session;
+        const dur = s.duration_seconds ? `${Math.floor(s.duration_seconds/60)}m ${s.duration_seconds%60}s` : '-';
+        document.getElementById('transcript-modal-title').textContent = `Transcript — ${d.employee_name}`;
+
+        document.getElementById('transcript-modal-body').innerHTML = `
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+                <div class="summary-stat"><h4>${dur}</h4><p>Duration</p></div>
+                <div class="summary-stat"><h4>${s.turn_count}</h4><p>Exchanges</p></div>
+                <div class="summary-stat"><h4>${s.outcome||'—'}</h4><p>Outcome</p></div>
+            </div>
+            ${s.summary ? `<div style="background:#f8f9fa;padding:12px;border-radius:8px;margin-bottom:16px;font-size:14px;"><strong>Summary:</strong> ${escHtml(s.summary)}</div>` : ''}
+            <div class="transcript-box">
+                ${d.messages.map(m => `
+                    <div class="transcript-line">
+                        <span class="tl-role ${m.role}">${m.role==='assistant'?'🤖 Arya':'👤 User'}</span>
+                        ${escHtml(m.content)}
+                    </div>`).join('')}
+            </div>`;
+    } catch(e) { document.getElementById('transcript-modal-body').innerHTML = '<p class="no-data">Error loading transcript</p>'; }
+}
+
+async function deleteSession(id) {
+    if (!confirm('Delete this call session and its transcript?')) return;
+    try {
+        const r = await fetch(`/ai-call/api/sessions/${id}/delete`, { method:'DELETE' });
+        const d = await r.json();
+        if (d.success) { showNotification('Session deleted', 'success'); loadHistory(); loadStats(); }
+        else showNotification(d.error, 'error');
+    } catch(e) { showNotification('Error', 'error'); }
+}
+
+window.onclick = (e) => {
+    if (e.target === document.getElementById('transcriptModal'))
+        document.getElementById('transcriptModal').style.display = 'none';
+};
+</script>
+{% endblock %}

@@ -2,6 +2,14 @@
 Axis Ops Tracker - Main Application Entry Point
 Run this file to start the Flask development server
 """
+import os
+# Load .env file if present
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv not installed, env vars must be set manually
+
 from app import create_app
 
 app = create_app()
